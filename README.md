@@ -1,12 +1,15 @@
 # HouseCoursework：住宅交互与智慧家居
 
-Unreal Engine 5.3.2 计算机图形学课程项目。当前团队起点为 v0.17.1（“智慧”页入口）。
+Unreal Engine 5.3.2 计算机图形学课程项目。当前团队起点为 v0.17.1。
 
-公开仓库保存 C++ 源码、配置、工具和资源版本清单。完整 `Content` 资源由组内网盘分发，包括住宅模型、贴图、地图、角色、字体及生成的 UE 资源。资源原文件和网盘提取信息不放在公开仓库。
+公开仓库保存 C++ 源码、配置、工具和资源版本清单。完整 `Content` 资源由组内网盘分发，包括住宅模型、贴图、地图、角色、字体及生成的 UE 资源。
+
+> 省流：让codex帮你配
 
 ## 第一次加入
 
-1. 安装 Git for Windows、UE **5.3.2**。参与开发者还需要 VS 2022 的“使用 C++ 的游戏开发”、MSVC **14.38** 工具集及 Windows SDK。仅体验者使用组内运行包即可。
+1. 安装 Git for Windows、UE **5.3.2**。 VS 2022 的“使用 C++ 的游戏开发”、MSVC **14.38** 工具集及 Windows SDK。
+
 2. 下载仓库：
 
    ```powershell
@@ -14,28 +17,34 @@ Unreal Engine 5.3.2 计算机图形学课程项目。当前团队起点为 v0.17
    cd HouseCoursework_Build
    ```
 
-3. 向组内负责人获取网盘资源文件夹。首次资源为四个 ZIP，放在同一文件夹；后续新加入者还需下载清单列出的增量包。先关闭 UE，然后导入：
+3. GitHub 工程放在：`D:\HouseCoursework_Build`，
 
-   ```powershell
-   .\Team\Import-Assets.ps1 -PackageDirectory "D:\下载\住宅资源" -EngineRoot "D:\epic\UE_5.3"
+   网盘里的四个 ZIP 放在：`D:\HouseCoursework_Assets`，**不要解压**。
+
+   然后关闭 UE，打开  `powershell`粘贴下面的命令：
+
+   ```
+   cd D:\HouseCoursework_Build
+   .\Team\Import-Assets.ps1 -PackageDirectory "D:\HouseCoursework_Assets"
    ```
 
-   `EngineRoot` 改成自己的 UE 安装目录。脚本使用引擎自带 Python，检查资源包哈希、文件版本和本地修改；不用手动解压覆盖。导入完成后 `Content` 与 `Source` 位于同一级。
+   看到 **`Import complete`** 就表示资源导入成功。
 
 4. 右键 `HouseCoursework.uproject` → Generate Visual Studio project files，打开生成的解决方案，选择 **Development Editor / Win64**，编译 `HouseCoursework`，再打开 `.uproject`。如提示缺少引擎插件，按项目声明启用 UE 安装中对应组件，不随意升级引擎。
+
 5. 首次打开会扫描资源、编译着色器。默认住宅地图为 `/Game/HouseFurniture/Maps/Demo_01_Night`。运行、Tab 智慧页、E 交互等见 [操作说明](Docs/操作说明.md)。
 
-## 每天怎么协作
+## 怎么协作
 
 - 开工前关闭 UE，确认自己的修改已提交，然后 `git switch main`、`git pull --ff-only`。若 `Team/asset-manifest.json` 变化，从组内下载对应新资源包并再次运行导入脚本。
 - 每项任务开一个分支，例如 `git switch -c feature/kitchen-lighting`。先在群里说明负责模块和将修改的地图/蓝图。
-- 保存并验证代码后提交自己的文件、推送分支，创建 Pull Request，由负责人检查和合并。`main` 保留可运行版本。
+- 保存并验证代码后提交自己的文件、推送分支，创建 Pull Request，由我检查和合并。`main` 保留可运行版本。
 - **同一地图或蓝图同一时间只由一人修改。** 两个人分别改 C++ 文件通常可以合并，二进制资源不能这样处理。
 - `Content` 被 Git 忽略，因此 UE 资源改动不会自动出现在 Git 提交中，交付资源必须走下面的增量流程。
 
 ## 改了蓝图、地图、模型或材质怎么办
 
-1. 保存并关闭 UE，确认负责人已同意该资源修改。
+1. 保存并关闭 UE。
 2. 导出资源增量，版本名使用新的唯一名称：
 
    ```powershell
@@ -60,7 +69,4 @@ Unreal Engine 5.3.2 计算机图形学课程项目。当前团队起点为 v0.17
 ## 公开仓库边界
 
 - 提交前执行 `python Team/check_public_files.py`，检查已跟踪文件中是否误入资源、压缩包、二进制或明显凭据。
-- 原始住宅素材的授权信息由原工程提供者保留，新增人物和字体的来源见 [ASSET_CREDITS.md](ASSET_CREDITS.md)。公开代码不代表住宅素材获得公开再分发许可。
-- 历史运行包和庞大的验收截图保留在维护者本地，不同步进这个轻量团队仓库。
-
-这个仓库从可运行版本建立新的团队起点；维护者原始本地 Git 历史与 v0.8 回退包继续保留。
+- 原始住宅素材的授权信息由钟子杰保留，新增人物和字体的来源见 [ASSET_CREDITS.md](ASSET_CREDITS.md)。
