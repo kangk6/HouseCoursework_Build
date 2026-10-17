@@ -57,6 +57,15 @@ class AssetPacks(unittest.TestCase):
             self.install()
         self.assertEqual(local.read_bytes(), b'unshared local edit')
 
+    def test_reusing_delta_version_in_another_folder_is_rejected(self):
+        lamp = self.source / 'Content/Test/lamp.uasset'
+        lamp.write_bytes(b'first delta')
+        with contextlib.redirect_stdout(io.StringIO()):
+            assets.export_assets(self.source, self.manifest, self.root / 'delta-one', 'unique-update')
+            lamp.write_bytes(b'second delta')
+            with self.assertRaisesRegex(ValueError, 'version already exists'):
+                assets.export_assets(self.source, self.manifest, self.root / 'delta-two', 'unique-update')
+
     def test_damaged_pack_fails_before_content_writes(self):
         archive = next(self.base.glob('*.zip'))
         archive.write_bytes(archive.read_bytes() + b'bad bytes')

@@ -100,6 +100,9 @@ def export_assets(root, manifest_path, output, version, tracked_only=False, init
     if old and not groups and set(prior) == set(names):
         print('No asset changes. Manifest kept unchanged.', flush=True)
         return old
+    old_pack_names = {x['name'] for x in old['packs']} if old else set()
+    if set(groups) & old_pack_names:
+        raise ValueError('Pack version already exists in the manifest; choose a new unique version')
     output.mkdir(parents=True, exist_ok=True)
     for name in groups:
         if (output / name).exists():
