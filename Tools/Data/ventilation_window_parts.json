@@ -1,0 +1,653 @@
+[
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Corners/SM_Corner_1Floor_A3_Sym.SM_Corner_1Floor_A3_Sym",
+    "frame": "/Game/Coursework/Ventilation/SM_Corner_1Floor_A3_Sym_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Corner_1Floor_A3_Sym_Sash0",
+        "pivot": [
+          107.06857,
+          -0.6248049999999999,
+          184.82305
+        ],
+        "center": [
+          107.06857,
+          -0.6248049999999999,
+          184.82305
+        ],
+        "extent": [
+          33.7237,
+          1.721635,
+          33.5257
+        ],
+        "travel": [
+          0,
+          0,
+          63.0514
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          107.06857,
+          -0.6248049999999999,
+          216.34875
+        ],
+        "proxy_extent": [
+          33.7237,
+          12,
+          65.0514
+        ],
+        "mode": "vertical_slide",
+        "triangles": 120
+      },
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Corner_1Floor_A3_Sym_Sash1",
+        "pivot": [
+          180.227485,
+          -0.6248049999999999,
+          184.823035
+        ],
+        "center": [
+          180.227485,
+          -0.6248049999999999,
+          184.823035
+        ],
+        "extent": [
+          33.723704999999995,
+          1.721635,
+          33.525684999999996
+        ],
+        "travel": [
+          0,
+          0,
+          63.05136999999999
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          180.227485,
+          -0.6248049999999999,
+          216.34872
+        ],
+        "proxy_extent": [
+          33.723704999999995,
+          12,
+          65.05136999999999
+        ],
+        "mode": "vertical_slide",
+        "triangles": 120
+      }
+    ],
+    "total_triangles": 1740
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Windows/SM_Window_Floor1_A3_400.SM_Window_Floor1_A3_400",
+    "frame": "/Game/Coursework/Ventilation/SM_Window_Floor1_A3_400_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor1_A3_400_Sash0",
+        "pivot": [
+          -180.093605,
+          -0.61758,
+          184.809665
+        ],
+        "center": [
+          -180.093605,
+          -0.61758,
+          184.809665
+        ],
+        "extent": [
+          33.723715,
+          1.72164,
+          33.525724999999994
+        ],
+        "travel": [
+          0,
+          0,
+          63.05144999999999
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -180.093605,
+          -0.61758,
+          216.33539000000002
+        ],
+        "proxy_extent": [
+          33.723715,
+          12,
+          65.05145
+        ],
+        "mode": "vertical_slide",
+        "triangles": 120
+      },
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor1_A3_400_Sash1",
+        "pivot": [
+          -106.93468,
+          -0.617565,
+          184.809665
+        ],
+        "center": [
+          -106.93468,
+          -0.617565,
+          184.809665
+        ],
+        "extent": [
+          33.72372,
+          1.721645,
+          33.525724999999994
+        ],
+        "travel": [
+          0,
+          0,
+          63.05144999999999
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -106.93468,
+          -0.617565,
+          216.33539000000002
+        ],
+        "proxy_extent": [
+          33.72372,
+          12,
+          65.05145
+        ],
+        "mode": "vertical_slide",
+        "triangles": 120
+      }
+    ],
+    "total_triangles": 1635
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Corners/SM_Corner_1Floor_A5.SM_Corner_1Floor_A5",
+    "frame": "/Game/Coursework/Ventilation/SM_Corner_1Floor_A5_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Corner_1Floor_A5_Sash0",
+        "pivot": [
+          -142.22245,
+          -1.311535,
+          201.096645
+        ],
+        "center": [
+          -142.22245,
+          -1.311535,
+          201.096645
+        ],
+        "extent": [
+          33.723729999999996,
+          1.721655,
+          31.312905
+        ],
+        "travel": [
+          0,
+          0,
+          58.62581
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -142.22245,
+          -1.311535,
+          230.40954999999997
+        ],
+        "proxy_extent": [
+          33.723729999999996,
+          12,
+          60.62580999999999
+        ],
+        "mode": "vertical_slide",
+        "triangles": 120
+      }
+    ],
+    "total_triangles": 1247
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Windows/SM_Window_Floor1_A4_400.SM_Window_Floor1_A4_400",
+    "frame": "/Game/Coursework/Ventilation/SM_Window_Floor1_A4_400_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor1_A4_400_Sash0",
+        "pivot": [
+          -141.59050000000002,
+          -0.8806649999999999,
+          184.80963
+        ],
+        "center": [
+          -141.59050000000002,
+          -0.8806649999999999,
+          184.80963
+        ],
+        "extent": [
+          33.72372,
+          1.7216749999999998,
+          33.525710000000004
+        ],
+        "travel": [
+          0,
+          0,
+          63.05142000000001
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -141.59050000000002,
+          -0.8806649999999999,
+          216.33533999999997
+        ],
+        "proxy_extent": [
+          33.72372,
+          12,
+          65.05142
+        ],
+        "mode": "vertical_slide",
+        "triangles": 120
+      }
+    ],
+    "total_triangles": 1142
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Windows/SM_Window_Floor1_A5_200.SM_Window_Floor1_A5_200",
+    "frame": "/Game/Coursework/Ventilation/SM_Window_Floor1_A5_200_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor1_A5_200_Sash0",
+        "pivot": [
+          -98.27119,
+          0.711405,
+          280.03308
+        ],
+        "center": [
+          -98.27119,
+          0.711405,
+          261.585715
+        ],
+        "extent": [
+          32.03875000000001,
+          2.174825,
+          18.44736499999999
+        ],
+        "travel": [
+          0,
+          0,
+          0
+        ],
+        "axis": [
+          1,
+          0,
+          0
+        ],
+        "angle": 40,
+        "proxy_center": [
+          -98.27119,
+          0.711405,
+          261.585715
+        ],
+        "proxy_extent": [
+          32.03875000000001,
+          12,
+          18.44736499999999
+        ],
+        "mode": "awning",
+        "triangles": 72
+      }
+    ],
+    "total_triangles": 536
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Windows/SM_Window_Floor2_A3_400.SM_Window_Floor2_A3_400",
+    "frame": "/Game/Coursework/Ventilation/SM_Window_Floor2_A3_400_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor2_A3_400_Sash0",
+        "pivot": [
+          -175.86918500000002,
+          -0.6175900000000001,
+          444.52095
+        ],
+        "center": [
+          -175.86918500000002,
+          -0.6175900000000001,
+          444.52095
+        ],
+        "extent": [
+          33.72372499999999,
+          1.72164,
+          33.01997
+        ],
+        "travel": [
+          0,
+          0,
+          62.03994
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -175.86918500000002,
+          -0.6175900000000001,
+          475.54092
+        ],
+        "proxy_extent": [
+          33.72372499999999,
+          12,
+          64.03994
+        ],
+        "mode": "vertical_slide",
+        "triangles": 120
+      },
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor2_A3_400_Sash1",
+        "pivot": [
+          -102.710285,
+          -0.61756,
+          444.52095
+        ],
+        "center": [
+          -102.710285,
+          -0.61756,
+          444.52095
+        ],
+        "extent": [
+          33.723735000000005,
+          1.7216399999999998,
+          33.01997
+        ],
+        "travel": [
+          0,
+          0,
+          62.03994
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -102.710285,
+          -0.61756,
+          475.54092
+        ],
+        "proxy_extent": [
+          33.723735000000005,
+          12,
+          64.03994
+        ],
+        "mode": "vertical_slide",
+        "triangles": 120
+      }
+    ],
+    "total_triangles": 1621
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Windows/SM_Window_Floor2_C1_400.SM_Window_Floor2_C1_400",
+    "frame": "/Game/Coursework/Ventilation/SM_Window_Floor2_C1_400_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor2_C1_400_Sash0",
+        "pivot": [
+          -144.16604,
+          -0.424115,
+          474.58267
+        ],
+        "center": [
+          -144.16604,
+          -0.424115,
+          474.58267
+        ],
+        "extent": [
+          39.51342,
+          1.721635,
+          61.682770000000005
+        ],
+        "travel": [
+          -75.03203000000002,
+          0,
+          0
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -143.88737500000002,
+          1.5290700000000002,
+          474.58267
+        ],
+        "proxy_extent": [
+          114.824115,
+          12,
+          61.682770000000005
+        ],
+        "mode": "horizontal_slide",
+        "triangles": 100
+      }
+    ],
+    "total_triangles": 756
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Windows/SM_Window_Floor2_A1_200.SM_Window_Floor2_A1_200",
+    "frame": "/Game/Coursework/Ventilation/SM_Window_Floor2_A1_200_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor2_A1_200_Sash0",
+        "pivot": [
+          -72.14802,
+          -0.485445,
+          445.81207
+        ],
+        "center": [
+          -72.14802,
+          -0.485445,
+          445.81207
+        ],
+        "extent": [
+          32.27064,
+          1.7216550000000002,
+          32.76605000000001
+        ],
+        "travel": [
+          0,
+          0,
+          61.532100000000014
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -72.14802,
+          -0.485445,
+          476.57812
+        ],
+        "proxy_extent": [
+          32.27064,
+          12,
+          63.532100000000014
+        ],
+        "mode": "vertical_slide",
+        "triangles": 72
+      }
+    ],
+    "total_triangles": 600
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Corners/SM_Corner_2Floor_C1_400.SM_Corner_2Floor_C1_400",
+    "frame": "/Game/Coursework/Ventilation/SM_Corner_2Floor_C1_400_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Corner_2Floor_C1_400_Sash0",
+        "pivot": [
+          100.938705,
+          -0.4228599999999999,
+          474.58249
+        ],
+        "center": [
+          100.938705,
+          -0.4228599999999999,
+          474.58249
+        ],
+        "extent": [
+          39.51341500000001,
+          1.7216299999999998,
+          61.682770000000005
+        ],
+        "travel": [
+          -75.032025,
+          0,
+          0
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          101.21735,
+          1.5303250000000002,
+          474.58249
+        ],
+        "proxy_extent": [
+          114.82409,
+          12,
+          61.682770000000005
+        ],
+        "mode": "horizontal_slide",
+        "triangles": 100
+      }
+    ],
+    "total_triangles": 826
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Corners/SM_Corner_2Floor_E1_400.SM_Corner_2Floor_E1_400",
+    "frame": "/Game/Coursework/Ventilation/SM_Corner_2Floor_E1_400_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Corner_2Floor_E1_400_Sash0",
+        "pivot": [
+          -60.80161,
+          3.48347,
+          474.58249
+        ],
+        "center": [
+          -60.80161,
+          3.48347,
+          474.58249
+        ],
+        "extent": [
+          39.513419999999996,
+          1.7216299999999998,
+          61.682770000000005
+        ],
+        "travel": [
+          -75.03202500000002,
+          0,
+          0
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -98.31762499999999,
+          1.530285,
+          474.58249
+        ],
+        "proxy_extent": [
+          77.029435,
+          12,
+          61.682770000000005
+        ],
+        "mode": "horizontal_slide",
+        "triangles": 100
+      }
+    ],
+    "total_triangles": 726
+  },
+  {
+    "source": "/Game/HouseFurniture/Meshes/House/Wall/Windows/SM_Window_Floor2_E1_400.SM_Window_Floor2_E1_400",
+    "frame": "/Game/Coursework/Ventilation/SM_Window_Floor2_E1_400_Frame",
+    "parts": [
+      {
+        "asset": "/Game/Coursework/Ventilation/SM_Window_Floor2_E1_400_Sash0",
+        "pivot": [
+          -105.404505,
+          3.8282999999999996,
+          476.330155
+        ],
+        "center": [
+          -105.404505,
+          3.8282999999999996,
+          476.330155
+        ],
+        "extent": [
+          37.835625,
+          1.72163,
+          63.430285
+        ],
+        "travel": [
+          -70.14417499999999,
+          0,
+          0
+        ],
+        "axis": [
+          0,
+          0,
+          0
+        ],
+        "angle": 0,
+        "proxy_center": [
+          -139.661025,
+          1.87512,
+          476.330155
+        ],
+        "proxy_extent": [
+          72.09214500000002,
+          12,
+          63.430285
+        ],
+        "mode": "horizontal_slide",
+        "triangles": 100
+      }
+    ],
+    "total_triangles": 652
+  }
+]

@@ -1,0 +1,36 @@
+import unreal
+folder='/Game/Coursework/Safety'
+edit=unreal.MaterialEditingLibrary
+def material(name):
+    m=unreal.load_asset(folder+'/'+name)
+    if m is None:m=unreal.AssetToolsHelpers.get_asset_tools().create_asset(name,folder,unreal.Material,unreal.MaterialFactoryNew())
+    edit.delete_all_material_expressions(m)
+    m.set_editor_property('shading_model',unreal.MaterialShadingModel.MSM_UNLIT)
+    return m
+m=material('M_AssemblyMarker');m.set_editor_property('blend_mode',unreal.BlendMode.BLEND_TRANSLUCENT)
+uv=edit.create_material_expression(m,unreal.MaterialExpressionTextureCoordinate,-600,0)
+center=edit.create_material_expression(m,unreal.MaterialExpressionConstant2Vector,-600,150)
+center.set_editor_property('r',.5);center.set_editor_property('g',.5)
+outer=edit.create_material_expression(m,unreal.MaterialExpressionSphereMask,-350,0)
+inner=edit.create_material_expression(m,unreal.MaterialExpressionSphereMask,-350,200)
+for node,radius in ((outer,.48),(inner,.42)):
+    value=edit.create_material_expression(m,unreal.MaterialExpressionConstant,-600,300)
+    value.set_editor_property('r',radius)
+    assert edit.connect_material_expressions(value,'',node,'Radius')
+    assert edit.connect_material_expressions(uv,'',node,'A')
+    assert edit.connect_material_expressions(center,'',node,'B')
+ring=edit.create_material_expression(m,unreal.MaterialExpressionSubtract,-100,0)
+assert edit.connect_material_expressions(outer,'',ring,'A')
+assert edit.connect_material_expressions(inner,'',ring,'B')
+assert edit.connect_material_property(ring,'',unreal.MaterialProperty.MP_OPACITY)
+color=edit.create_material_expression(m,unreal.MaterialExpressionConstant3Vector,-100,-200)
+color.set_editor_property('constant',unreal.LinearColor(.025,.28,.16,1))
+assert edit.connect_material_property(color,'',unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+edit.recompile_material(m);unreal.EditorAssetLibrary.save_loaded_asset(m)
+m=material('M_SensorSignal')
+color=edit.create_material_expression(m,unreal.MaterialExpressionVectorParameter,-100,0)
+color.set_editor_property('parameter_name','SignalColor')
+color.set_editor_property('default_value',unreal.LinearColor(.02,.07,.025,1))
+assert edit.connect_material_property(color,'',unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+edit.recompile_material(m);unreal.EditorAssetLibrary.save_loaded_asset(m)
+unreal.log('EVACUATION_ASSETS_READY')
