@@ -51,7 +51,7 @@ bool ACourseworkDaylight::Apply(float Value)
             TArray<USceneComponent*> Parts;It->GetComponents(Parts);
             for(auto* C:Parts)
             {
-                auto* Ambient=NightAmbient?Cast<ULightComponent>(C):nullptr;
+                auto* Ambient=Cast<ULightComponent>(C);
                 Components.Add({C,C->IsVisible(),Ambient?Ambient->Intensity:-1.f});
                 if(!Ambient)C->SetVisibility(false,false);
             }
@@ -72,7 +72,6 @@ bool ACourseworkDaylight::Apply(float Value)
         {OriginalSkyTimeSlice=CVar->GetInt();bChangedSkyTimeSlice=OriginalSkyTimeSlice!=0;if(bChangedSkyTimeSlice)CVar->SetWithCurrentPriority(0);}
         bActive=true;RenderedHour=FMath::Clamp(Value,6.f,22.f);PreviewWeight=0;
         Sky->SetVisibility(true);Sun->SetVisibility(true);SetActorTickEnabled(true);
-        GetWorld()->GetTimerManager().SetTimer(AtmosphereTimer,[this](){if(bActive)Atmosphere->SetVisibility(true);},.1f,false);
     }
     Hour=FMath::Clamp(Value,6.f,22.f);
     Elevation=FMath::Max(0.f,65.f*FMath::Sin(FMath::Clamp((Hour-6)/12.f,0.f,1.f)*PI));
@@ -93,7 +92,7 @@ void ACourseworkDaylight::UpdateLighting()
 {
     const float Phase=(RenderedHour-6)/12.f;
     const float SolarElevation=65.f*FMath::Sin(Phase*PI);
-    const float DayWeight=FMath::SmoothStep(-6.f,12.f,SolarElevation);
+    const float DayWeight=FMath::SmoothStep(0.f,12.f,SolarElevation);
     const float Yaw=FMath::Lerp(-90.f,90.f,Phase);
     Sun->SetWorldRotation(FRotator(-SolarElevation,Yaw,0));
     const float SunStrength=FMath::SmoothStep(0.f,8.f,SolarElevation);
@@ -101,8 +100,38 @@ void ACourseworkDaylight::UpdateLighting()
     Sun->SetLightColor(FMath::Lerp(FLinearColor(1,.53f,.24f),FLinearColor(1,.96f,.87f),FMath::Clamp(SolarElevation/40.f,0.f,1.f)));
     Sky->SetIntensity(FMath::Lerp(.08f,.9f,DayWeight)*PreviewWeight);
     Sky->SetLightColor(FMath::Lerp(FLinearColor(.35f,.5f,1),FLinearColor(1,.98f,.93f),DayWeight));
-    if(Exposure)Exposure->BlendWeight=PreviewWeight;
-    for(const auto& S:Components)if(S.AmbientIntensity>=0)if(auto* L=Cast<ULightComponent>(S.Component.Get()))L->SetIntensity(S.AmbientIntensity*(1-PreviewWeight));
+    // Night uses the authored night exposure, sky and fill lights. Previously
+    // selecting 21:00 removed those fills and forced daylight exposure to zero,
+    // making both household lights and the night guidance almost invisible.
+    const float DayBlend=PreviewWeight*DayWeight;
+    const bool OriginalNight=DayWeight<=KINDA_SMALL_NUMBER;
+    for(const auto& S:Meshes)if(auto* C=S.Component.Get())if(auto* M=S.Original.Get())
+    {
+        UStaticMesh* Desired=M;
+        if(!OriginalNight)for(const auto& Comparison:ComparisonMeshes)if(Comparison->GetName()==M->GetName()+TEXT("_Daylight")){Desired=Comparison;break;}
+        if(C->GetStaticMesh()!=Desired)C->SetStaticMesh(Desired);
+    }
+    if(Exposure)Exposure->BlendWeight=DayBlend;
+    Sky->SetVisibility(!OriginalNight);Sun->SetVisibility(!OriginalNight);
+    for(const auto& S:Actors)if(auto* A=S.Actor.Get())
+        A->SetActorHiddenInGame(S.Hidden||(!OriginalNight&&!A->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))));
+    for(const auto& S:Components)if(auto* C=S.Component.Get())
+    {
+        if(auto* L=Cast<ULightComponent>(C))
+        {
+            if(S.AmbientIntensity>=0)L->SetIntensity(S.AmbientIntensity*(1-DayBlend));
+            C->SetVisibility(S.Visible&&(OriginalNight||C->GetOwner()->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))),false);
+        }
+        else C->SetVisibility(S.Visible&&OriginalNight,false);
+    }
+    // Re-entering daytime must follow the same ordering as first activation.
+    // UE checks the render scene for static sky lights when adding atmosphere;
+    // enabling it in the same frame as removing the old sky leaves a permanent
+    // false "lighting needs rebuild" dependency on that static night sky.
+    if(OriginalNight)
+    {GetWorld()->GetTimerManager().ClearTimer(AtmosphereTimer);Atmosphere->SetVisibility(false);}
+    else if(!Atmosphere->IsVisible()&&!GetWorld()->GetTimerManager().IsTimerActive(AtmosphereTimer))
+        GetWorld()->GetTimerManager().SetTimer(AtmosphereTimer,[this](){if(bActive)Atmosphere->SetVisibility(true);},.1f,false);
 }
 void ACourseworkDaylight::Restore()
 {

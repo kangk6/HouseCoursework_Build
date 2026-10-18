@@ -166,7 +166,7 @@ void ACourseworkHUD::TickSmartLighting(float Dt)
     auto* PC=GetOwningPlayerController();if(!PC||!PC->GetPawn())return;
     const FVector Player=PC->GetPawn()->GetActorLocation();const int32 PreviousZone=SmartPlayerZone;SmartPlayerZone=SmartZoneAt(Player);
     const double Now=GetWorld()->GetTimeSeconds();
-    const bool Dark=!IsDaylightActive()||GetDaylightHour()<7||GetDaylightHour()>19;
+    const bool Dark=NeedsNightLighting();
     // The original actor's origin is at the feet; zone heights use pawn centres.
     const int32 ResidentZone=OriginalResident.IsValid()?SmartZoneAt(GetResidentPosition()):INDEX_NONE;
     if(SmartLightingScene==1&&Dark)
@@ -206,7 +206,7 @@ void ACourseworkHUD::TickSmartLighting(float Dt)
         if(Intensity>.01f)++ActivePathFills;
     }
     if(SmartLightingScene==1&&PreviousZone!=SmartPlayerZone)
-        UE_LOG(LogTemp,Display,TEXT("SMART_NIGHT_ZONE from=%d to=%d position=%s dark=%d path_fills=%d"),PreviousZone,SmartPlayerZone,*Player.ToString(),Dark,ActivePathFills);
+            UE_LOG(LogTemp,Display,TEXT("SMART_NIGHT_ZONE from=%d to=%d position=%s dark=%d hour=%.3f elevation=%.3f path_fills=%d"),PreviousZone,SmartPlayerZone,*Player.ToString(),Dark,GetDaylightHour(),GetDaylightElevation(),ActivePathFills);
     for(int32 I=0;I<SmartStairFills.Num();++I)if(auto* Light=SmartStairFills[I].Get())
     {
         const FName Key(*FString::Printf(TEXT("stair_bounce_%d"),I));
@@ -279,7 +279,7 @@ void ACourseworkHUD::ApplySmartLighting()
         if(const auto* Original=SmartOriginalColors.Find(C))
         {
             const bool Manual=SmartManualRooms.Contains(Light.Room)||SmartFixtureOverrides.Contains(Name);
-            const bool Night=!IsDaylightActive()||GetDaylightHour()<7||GetDaylightHour()>19;
+            const bool Night=NeedsNightLighting();
             const bool Warm=SmartLightingScene==1&&Night&&(SmartTrailUntil.FindRef(Name)>GetWorld()->GetTimeSeconds()||SmartRoomUntil.FindRef(Light.Room)>GetWorld()->GetTimeSeconds())&&!Manual;
             const FLinearColor Color=Warm?FLinearColor(1,.57f,.26f):*Original;
             // LightColor is stored as 8-bit sRGB; tolerate its quantization so
@@ -296,7 +296,7 @@ void ACourseworkHUD::ApplySmartLighting()
 
 FString ACourseworkHUD::GetSmartLightingStatus()const
 {
-    if(SmartLightingScene==1)return TEXT("就寝起夜 · 沿途柔光");
+    if(SmartLightingScene==1)return NeedsNightLighting()?TEXT("就寝起夜 · 沿途柔光"):TEXT("就寝起夜 · 等待天黑");
     if(SmartLightingScene==2&&(SmartFixtureOverrides.Contains(StudyDesk)||SmartManualRooms.Contains(4)))return TEXT("阅读助手 · 保留手动照明");
     if(SmartLightingScene==2)return bSmartReadingOccupied?TEXT("桌边阅读 · 正在补光"):TEXT("阅读助手 · 等你走近书桌");
     return TEXT("日常手动 · 由你掌控");
@@ -305,7 +305,7 @@ FString ACourseworkHUD::GetSmartLightingDetail()const
 {
     if(SmartLightingScene==1)
     {
-        if(IsDaylightActive()&&GetDaylightHour()>=7&&GetDaylightHour()<=19)return TEXT("白天暂停引路，保留日常照明配置");
+        if(!NeedsNightLighting())return TEXT("白天暂停引路，保留日常照明配置");
         return TEXT("走近时提前补亮床边出口与沿途，离开后延时渐暗");
     }
     if(SmartLightingScene==2&&(SmartFixtureOverrides.Contains(StudyDesk)||SmartManualRooms.Contains(4)))return TEXT("保留你的灯光调整，退出场景后恢复日常配置");

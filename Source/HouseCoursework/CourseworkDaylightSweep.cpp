@@ -47,7 +47,7 @@ void ACourseworkHUD::TickDaylightSweep()
     }
     if(auto* V=GetWorld()->GetGameViewport()->Viewport)
     {
-        TArray<FColor> Pixels;FIntVector Size;auto Window=GetWorld()->GetGameViewport()->GetWindow();
+        TArray<FColor> Pixels;FIntVector Size=FIntVector::ZeroValue;auto Window=GetWorld()->GetGameViewport()->GetWindow();
         if(Window.IsValid()&&FSlateApplication::Get().TakeScreenshot(Window.ToSharedRef(),Pixels,Size)&&Pixels.Num())
         {
             double L=0;int32 Count=0;

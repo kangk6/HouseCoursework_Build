@@ -87,7 +87,7 @@ void ACourseworkHUD::TriggerKitchenAlarm()
 {
     if(IsSafetyDrillRunning()||!IsSafetyReady())return;
     SetSmartLightingScene(0);
-    RestoreDaylight();
+    // A drill changes the hazard state, not the user's selected time of day.
     RestoreEnergyComparison();bEnergyMapLayer=false;
     SafetyState=1;SmokeReading=0;AlarmElapsed=0;SafetySmokeLevel=0;
     bPlayerGathered=false;PlayerArrivalTime=-1;ResidentArrivalTime=-1;LastEvacuationResult.Empty();

@@ -9,6 +9,7 @@
 #include "Components/SceneComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EngineUtils.h"
+#include "Engine/StaticMesh.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -262,12 +263,12 @@ void ACourseworkHUD::UpdateInteraction()
         auto* Mesh = Cast<UStaticMeshComponent>(Selected.GetComponent());
         Mesh=ResolveFurnitureTarget(Mesh);
         if(Mesh && ClosedTransforms.Contains(Mesh)) Actor=Mesh->GetOwner();
-        // The oven has one controllable door. Selecting its fixed case/glass
-        // should operate that door, while world occlusion is still respected.
-        if(Actor && Actor->GetClass()->GetName().Contains(TEXT("Oven")) && (!Mesh || !ClosedTransforms.Contains(Mesh)))
+        // Map fixed oven parts and the entrance's fixed pane to their single
+        // controllable leaf, while respecting closer world occlusion.
+        if(Actor && (Actor->GetClass()->GetName().Contains(TEXT("Oven"))||Actor->GetClass()->GetName().Contains(TEXT("Door_Outside_B"))) && (!Mesh || !ClosedTransforms.Contains(Mesh)))
         {
             TArray<UStaticMeshComponent*> Parts; Actor->GetComponents(Parts);
-            for(auto* Part:Parts) if(Part->GetName()==TEXT("StaticMeshComponent1") && ClosedTransforms.Contains(Part)) { Mesh=Part; break; }
+            for(auto* Part:Parts) if(ClosedTransforms.Contains(Part) && (Part->GetName()==TEXT("StaticMeshComponent1")||Part->GetName()==TEXT("Door"))) { Mesh=Part; break; }
         }
         if (Actor && Actor->FindFunction(TEXT("FurnitureAction")) && Mesh && ClosedTransforms.Contains(Mesh))
         {
@@ -296,7 +297,25 @@ void ACourseworkHUD::UpdateInteraction()
         }
         return false;
     };
-    if(HitPrecise && SetHit(Hit)) return;
+    // The entrance glass has no triangles in the visibility query. Intersect
+    // the actual moving leaf's local bounds instead of requiring aim at its
+    // narrow frame. A closer opaque object still blocks the interaction.
+    FHitResult DoorHit;float DoorDistance=230.f;
+    for(TActorIterator<AActor> It(GetWorld());It;++It)if(It->GetClass()->GetName().Contains(TEXT("Door_Outside_B")))
+    {
+        TArray<UStaticMeshComponent*> Parts;It->GetComponents(Parts);
+        for(auto* Part:Parts)if(Part->GetStaticMesh())
+        {
+            const auto& Transform=Part->GetComponentTransform();
+            FVector Point,Normal;float Time=0;
+            if(!FMath::LineExtentBoxIntersection(Part->GetStaticMesh()->GetBoundingBox(),Transform.InverseTransformPosition(Start),Transform.InverseTransformPosition(Start+Rotation.Vector()*230.f),FVector::ZeroVector,Point,Normal,Time))continue;
+            const float Distance=230.f*Time;
+            if(Distance>DoorDistance||(HitPrecise&&Hit.GetActor()!=*It&&Hit.Distance+.5f<Distance))continue;
+            DoorDistance=Distance;DoorHit=FHitResult(*It,Part,Transform.TransformPosition(Point),Transform.TransformVectorNoScale(Normal));DoorHit.Distance=Distance;
+        }
+    }
+    if(DoorHit.GetActor()&&SetHit(DoorHit))return;
+    if(HitPrecise && SetHit(Hit))return;
     // Small lamps should not require pixel-perfect aim. The first blocking hit
     // still wins, so the forgiving query cannot select through walls/cabinets.
     FHitResult NearbyLight;
@@ -306,7 +325,7 @@ void ACourseworkHUD::UpdateInteraction()
     // either face. Never choose it through a closer unrelated blocking surface.
     FHitResult Simple; Params.bTraceComplex=false;
     if(GetWorld()->LineTraceSingleByChannel(Simple,Start,Start+Rotation.Vector()*230.f,ECC_Visibility,Params)
-        && Simple.GetActor() && Simple.GetActor()->GetClass()->GetName().Contains(TEXT("Oven"))
+        && Simple.GetActor() && (Simple.GetActor()->GetClass()->GetName().Contains(TEXT("Oven"))||Simple.GetActor()->GetClass()->GetName().Contains(TEXT("Door_Outside_B")))
         && (!HitPrecise || Hit.GetActor()==Simple.GetActor() || Simple.Distance+0.5f<Hit.Distance)
         && SetHit(Simple)) return;
     if (Overlay) Overlay->SetInteraction(TEXT(""));
@@ -445,6 +464,7 @@ void ACourseworkHUD::QuitApplication()
 
 void ACourseworkHUD::TickAcceptanceTest()
 {
+    if(TestMode==TEXT("environment_regression")){TickEnvironmentRegression();return;}
     if(TestMode==TEXT("smart_lighting")){TickSmartLightingAcceptance();return;}
     if(TestMode==TEXT("ui_transitions")){TickTransitionAcceptance();return;}
     auto* PC = GetOwningPlayerController();

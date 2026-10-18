@@ -79,6 +79,7 @@ public:
     bool IsDaylightActive()const;
     float GetDaylightHour()const;
     float GetDaylightElevation()const;
+    bool NeedsNightLighting()const;
     void ObserveDaylight();
 
     // Runtime-only teaching simulation. Never persisted with household settings.
@@ -132,6 +133,7 @@ private:
     void TickFixtureAcceptance();
     void TickEnergyAcceptance();
     void TickDaylightAcceptance();
+    void TickEnvironmentRegression();
     void TickDaylightSweep();
     UPROPERTY() TObjectPtr<class ACourseworkDaylight> Daylight;
     UPROPERTY() TObjectPtr<class ACourseworkVentilation> Ventilation;

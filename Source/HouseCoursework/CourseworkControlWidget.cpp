@@ -128,7 +128,7 @@ public:
         else if(A==652)Owner->ToggleAirflowDisplay();
         else if(A==653)Owner->CloseAllWindows();
         else if(A==654&&Owner->GetRoomWindowCount(Room)>0)Owner->ObserveVentilation(Room);
-        else if(A==620)Owner->RestoreDaylight();
+        else if(A==620&&!Owner->IsSafetyDrillRunning())Owner->RestoreDaylight();
         else if(A==621)Owner->ObserveDaylight();
         else if(A==500||A==501)Owner->ApplyEnergyScenario(A==501);
         else if(A==502)Owner->RestoreEnergyComparison();
@@ -474,7 +474,7 @@ public:
             Text(300,493,TEXT("06:00"),13,Muted,false,true);Text(797,493,TEXT("22:00"),13,Muted,false,true);
             const TCHAR* Labels[]={TEXT("上午"),TEXT("正午"),TEXT("傍晚"),TEXT("夜间")};const float Hours[]={8,12,17,21};
             for(int32 I=0;I<4;++I){const float X=300+136.f*I;const bool Selected=Active&&FMath::IsNearlyEqual(Hour,Hours[I],.01f);if(Selected||Hover==610+I)Box(X,552,128,56,FLinearColor(Gold.R,Gold.G,Gold.B,.12f));Rect(X,552,128,56,Selected?Gold:Muted);CenterText(FSlateRect(X,552,X+128,608),Labels[I],18,Selected?Gold:ButtonColor);}
-            Rect(300,686,260,56,Hover==620?Gold:Muted);CenterText(FSlateRect(300,686,560,742),TEXT("恢复原夜景"),18,Ivory);
+            Rect(300,686,260,56,Hover==620&&!Locked?Gold:Muted);CenterText(FSlateRect(300,686,560,742),TEXT("恢复原夜景"),18,ButtonColor);
             Box(1016,282,428,340,FLinearColor(.015f,.022f,.028f,.86f));
             Text(1050,315,TEXT("观察什么"),22,Ivory);Text(1050,370,TEXT("窗边光斑的范围"),18,Muted);Text(1050,412,TEXT("地面与家具的投影"),18,Muted);Text(1050,454,TEXT("不同时段的室内明暗"),18,Muted);
             Text(1050,536,Active?FString::Printf(TEXT("太阳高度角  %.1f°"),Owner->GetDaylightElevation()):TEXT("选择时段开始对比"),17,Gold);
