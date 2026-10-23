@@ -4,7 +4,7 @@
 #include "UObject/StrongObjectPtr.h"
 #include "CourseworkDaylight.generated.h"
 
-// Owns only the temporary environmental comparison; household lighting is untouched.
+// Renders the shared 24-hour clock; household lighting is untouched.
 UCLASS()
 class HOUSECOURSEWORK_API ACourseworkDaylight : public AActor
 {
@@ -12,6 +12,7 @@ class HOUSECOURSEWORK_API ACourseworkDaylight : public AActor
 public:
     ACourseworkDaylight();
     bool Apply(float Hour);
+    bool Snap(float Hour);
     void Restore();
     bool IsActive()const{return bActive;}
     float GetHour()const{return Hour;}

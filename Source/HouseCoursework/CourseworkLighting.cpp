@@ -230,6 +230,8 @@ void ACourseworkHUD::InitializeRoomLighting()
     }
     UE_LOG(LogTemp,Display,TEXT("ROOM_LIGHTING lights=%d glow_parameters=%d"),ControlledLights.Num(),ControlledGlows.Num());
     bLightingReady=true;LoadRoomLighting();
+    // Capture night ambient actors only after they and movable window surfaces exist.
+    if(TestMode.IsEmpty()||TestMode==TEXT("clock"))InitializeTimeOfDay();
 }
 bool ACourseworkHUD::IsRoomLightOn(int32 Room)const{return SmartLightingScene?GetSmartRoomLevel(Room)>.001f:RoomLightOn[CourseworkRooms::Clamp(Room)];}
 float ACourseworkHUD::GetRoomBrightness(int32 Room)const{return SmartLightingScene?GetSmartRoomLevel(Room):RoomBrightness[CourseworkRooms::Clamp(Room)];}

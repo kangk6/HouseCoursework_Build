@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "CourseworkRooms.h"
+#include "CourseworkClock.h"
 #include "GameFramework/HUD.h"
 #include "CourseworkHUD.generated.h"
 class UCourseworkOverlay;
@@ -81,6 +82,14 @@ public:
     float GetDaylightElevation()const;
     bool NeedsNightLighting()const;
     void ObserveDaylight();
+    bool SetTimeFlowing(bool Running);
+    bool SetTimeDayMinutes(float Minutes);
+    bool IsTimeFlowing()const{return Clock.bRunning;}
+    float GetTimeDayMinutes()const{return Clock.DayMinutes;}
+    int64 GetTimeDay()const{return Clock.Day;}
+    bool IsTimeSuspended()const;
+    FString GetTimeStatus()const;
+    void InitializeTimeOfDay();
 
     // Runtime-only teaching simulation. Never persisted with household settings.
     void TriggerKitchenAlarm();
@@ -135,6 +144,9 @@ private:
     void TickDaylightAcceptance();
     void TickEnvironmentRegression();
     void TickDaylightSweep();
+    void TickTimeOfDay(float DeltaSeconds);
+    void TickClockAcceptance();
+    FCourseworkClock Clock;
     UPROPERTY() TObjectPtr<class ACourseworkDaylight> Daylight;
     UPROPERTY() TObjectPtr<class ACourseworkVentilation> Ventilation;
     int32 ComfortPage=0,TargetWindow=INDEX_NONE;

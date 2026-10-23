@@ -26,6 +26,7 @@
 #include "Particles/ParticleSystem.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/BlendSpace1D.h"
+#include "Camera/PlayerCameraManager.h"
 
 ACourseworkHUD::ACourseworkHUD()
 {
@@ -126,6 +127,7 @@ void ACourseworkHUD::BeginPlay()
     Overlay->SetOwnerHUD(this);
     Overlay->AddToViewport(20);
     FParse::Value(FCommandLine::Get(), TEXT("HouseTest="), TestMode);
+    if(TestMode.IsEmpty())PC->PlayerCameraManager->StartCameraFade(1,1,0,FLinearColor::Black,false,true);
     TestStartTime = GetWorld()->GetRealTimeSeconds();
     if(TestMode.StartsWith(TEXT("perf_")))
     {
@@ -234,6 +236,7 @@ void ACourseworkHUD::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     HintElapsed += DeltaSeconds;
+    TickTimeOfDay(DeltaSeconds);
     TickSafety(DeltaSeconds);
     TickSmartLighting(DeltaSeconds);
     if(Ventilation)Ventilation->Suspend(IsSafetyDrillRunning());
@@ -473,6 +476,7 @@ void ACourseworkHUD::TickAcceptanceTest()
     if(TestMode.StartsWith(TEXT("lighting_state_"))) { TickLightingStateAcceptance(); return; }
     if(TestMode==TEXT("ventilation_perf")){TickVentilationPerformance();return;}
     if(TestMode==TEXT("ventilation")||TestMode==TEXT("ventilation_view")){TickVentilationAcceptance();return;}
+    if(TestMode==TEXT("clock")){TickClockAcceptance();return;}
     if(TestMode==TEXT("daylight_sweep")){TickDaylightSweep();return;}
     if(TestMode==TEXT("daylight")){TickDaylightAcceptance();return;}
     if(TestMode==TEXT("energy")){TickEnergyAcceptance();return;}

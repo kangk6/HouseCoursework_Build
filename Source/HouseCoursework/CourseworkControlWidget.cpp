@@ -92,7 +92,7 @@ public:
         }
         if(Mode==9){Add(48,195,246,242,640);Add(48,247,246,294,641);}
         if(Mode==9&&Owner->GetComfortPage()==1){for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,320+49*I,246,367+49*I,110+CourseworkRooms::DisplayOrder[I]);Add(300,552,550,608,650);Add(566,552,816,608,651);Add(1050,686,1380,742,652);Add(566,686,816,742,653);Add(300,686,550,742,654);}
-        if(Mode==9&&Owner->GetComfortPage()==0){Add(296,435,844,505,600);for(int32 I=0;I<4;++I)Add(300+136*I,552,428+136*I,608,610+I);Add(300,686,560,742,620);Add(1050,686,1380,742,621);}
+        if(Mode==9&&Owner->GetComfortPage()==0){Add(296,435,844,505,600);for(int32 I=0;I<4;++I)Add(300+136*I,552,428+136*I,608,610+I);Add(300,686,560,742,620);Add(1050,686,1380,742,621);Add(300,622,560,670,624);Add(580,622,840,670,625);for(int32 I=0;I<3;++I)Add(1050+112*I,520,1154+112*I,568,630+I);}
         if(Mode==1) for(int32 I=0;I<6;++I) Add(300,288+I*64,682,347+I*64,300+I);
         if(Mode==4){Add(296,325,690,395,220);Add(296,496,690,566,221);}
         if(Mode==7){for(int32 I=0;I<3;++I)Add(300+180*I,585,470+180*I,641,400+I);Add(300,695,560,751,403);}
@@ -103,7 +103,7 @@ public:
     {
         if(!Owner.IsValid())return;
         const float T=FMath::Clamp((X-300.f)/382.f,0.f,1.f);
-        if(Action==600){const float DayT=FMath::Clamp((X-300.f)/540.f,0.f,1.f);Owner->SetDaylightHour(DayT<.00001f?6.f:DayT>.99999f?22.f:6+16*DayT);}
+        if(Action==600){const float DayT=FMath::Clamp((X-300.f)/540.f,0.f,1.f);Owner->SetDaylightHour(FMath::Min(DayT*24.f,1439.f/60.f));}
         if(Action==200) Owner->SetRoomLighting(Room,T>0,T);
         if(Action==220)Owner->ApplySensitivity(.25f+1.75f*T);
         if(Action==221)Owner->ApplySpeed(.5f+1.5f*T);
@@ -128,7 +128,9 @@ public:
         else if(A==652)Owner->ToggleAirflowDisplay();
         else if(A==653)Owner->CloseAllWindows();
         else if(A==654&&Owner->GetRoomWindowCount(Room)>0)Owner->ObserveVentilation(Room);
-        else if(A==620&&!Owner->IsSafetyDrillRunning())Owner->RestoreDaylight();
+        else if(A==620)Owner->SetDaylightHour(12);
+        else if(A==624||A==625)Owner->SetTimeFlowing(A==624);
+        else if(A>=630&&A<=632){const float Minutes[]={6,24,60};Owner->SetTimeDayMinutes(Minutes[A-630]);}
         else if(A==621)Owner->ObserveDaylight();
         else if(A==500||A==501)Owner->ApplyEnergyScenario(A==501);
         else if(A==502)Owner->RestoreEnergyComparison();
@@ -465,21 +467,25 @@ public:
         {
             const bool Active=Owner->IsDaylightActive(),Locked=Owner->IsSafetyDrillRunning();
             const FLinearColor ButtonColor=Locked?Muted:Ivory;
-            const float Hour=Owner->GetDaylightHour();const int32 Minutes=FMath::RoundToInt(Hour*60);
+            const float Hour=Owner->GetDaylightHour();const int32 Minutes=FMath::FloorToInt(Hour*60+.0001f)%1440;
             Text(56,154,TEXT("舒适"),17,Muted);Text(56,205,TEXT("日照采光"),21,Ivory);Box(48,201,3,29,Gold);Text(56,257,TEXT("自然通风"),21,Hover==641?Ivory:Muted);
             Text(300,160,TEXT("客厅  /  同一位置对比"),14,Muted);Text(300,197,TEXT("光影之间"),34,Ivory,true);
-            Text(300,296,Active?TEXT("预览时刻"):TEXT("原场景 · 尚未开始预览"),18,Muted);
+            Text(300,296,FString::Printf(TEXT("第 %lld 天   %s"),Owner->GetTimeDay(),*Owner->GetTimeStatus()),18,Muted);
             Text(300,329,Active?FString::Printf(TEXT("%02d:%02d"),Minutes/60,Minutes%60):FString(TEXT("--:--")),68,Ivory,false,true);
-            const float T=(Hour-6)/16.f;Box(300,468,540,4,FLinearColor(.2f,.22f,.23f));Box(300,468,540*T,4,Gold);Box(294+540*T,461,12,18,Ivory);
-            Text(300,493,TEXT("06:00"),13,Muted,false,true);Text(797,493,TEXT("22:00"),13,Muted,false,true);
+            const float T=Hour/24.f;Box(300,468,540,4,FLinearColor(.2f,.22f,.23f));Box(300,468,540*T,4,Gold);Box(294+540*T,461,12,18,Ivory);
+            Text(300,493,TEXT("00:00"),13,Muted,false,true);Text(550,493,TEXT("12:00"),13,Muted,false,true);Text(797,493,TEXT("23:59"),13,Muted,false,true);
             const TCHAR* Labels[]={TEXT("上午"),TEXT("正午"),TEXT("傍晚"),TEXT("夜间")};const float Hours[]={8,12,17,21};
             for(int32 I=0;I<4;++I){const float X=300+136.f*I;const bool Selected=Active&&FMath::IsNearlyEqual(Hour,Hours[I],.01f);if(Selected||Hover==610+I)Box(X,552,128,56,FLinearColor(Gold.R,Gold.G,Gold.B,.12f));Rect(X,552,128,56,Selected?Gold:Muted);CenterText(FSlateRect(X,552,X+128,608),Labels[I],18,Selected?Gold:ButtonColor);}
-            Rect(300,686,260,56,Hover==620&&!Locked?Gold:Muted);CenterText(FSlateRect(300,686,560,742),TEXT("恢复原夜景"),18,ButtonColor);
+            Rect(300,686,260,56,Hover==620&&!Locked?Gold:Muted);CenterText(FSlateRect(300,686,560,742),TEXT("回到正午"),18,ButtonColor);
+            Rect(300,622,260,48,Owner->IsTimeFlowing()?Gold:Muted);CenterText(FSlateRect(300,622,560,670),TEXT("时间流动"),18,Locked?Muted:Owner->IsTimeFlowing()?Gold:Ivory);
+            Rect(580,622,260,48,!Owner->IsTimeFlowing()?Gold:Muted);CenterText(FSlateRect(580,622,840,670),TEXT("固定当前时间"),18,Locked?Muted:!Owner->IsTimeFlowing()?Gold:Ivory);
             Box(1016,282,428,340,FLinearColor(.015f,.022f,.028f,.86f));
-            Text(1050,315,TEXT("观察什么"),22,Ivory);Text(1050,370,TEXT("窗边光斑的范围"),18,Muted);Text(1050,412,TEXT("地面与家具的投影"),18,Muted);Text(1050,454,TEXT("不同时段的室内明暗"),18,Muted);
-            Text(1050,536,Active?FString::Printf(TEXT("太阳高度角  %.1f°"),Owner->GetDaylightElevation()):TEXT("选择时段开始对比"),17,Gold);
+            Text(1050,315,TEXT("昼夜流速"),22,Ivory);Text(1050,370,TEXT("现实多少分钟经过一天"),18,Muted);Text(1050,412,TEXT("固定时间只暂停昼夜变化"),17,Muted);Text(1050,454,TEXT("人物与房间交互照常运行"),17,Muted);
+            const float Rates[]={6,24,60};
+            for(int32 I=0;I<3;++I){const float X=1050+112.f*I;const bool Chosen=FMath::IsNearlyEqual(Owner->GetTimeDayMinutes(),Rates[I]);Rect(X,520,104,48,Chosen?Gold:Muted);CenterText(FSlateRect(X,520,X+104,568),FString::Printf(TEXT("%d 分钟"),int32(Rates[I])),16,Locked?Muted:Chosen?Gold:Ivory);}
+            Text(1050,590,FString::Printf(TEXT("太阳高度角  %.1f°"),Owner->GetDaylightElevation()),16,Muted);
             Rect(1050,686,330,56,Hover==621?Gold:Muted);CenterText(FSlateRect(1050,686,1380,742),TEXT("前往客厅观察点"),18,ButtonColor);
-            Text(300,773,Locked?TEXT("疏散演练中 · 采光切换暂不可用"):TEXT("教学日照示意 · 灯具配置保留 · 关闭面板后继续观察"),13,Locked?Gold:Muted);
+            Text(300,773,Locked?TEXT("演练期间暂缓时间流动，结束后恢复原模式"):TEXT("全天日照示意；方向键微调时间，关闭此页后按所选模式运行"),13,Locked?Gold:Muted);
         }
         else if(Mode==1)
         {

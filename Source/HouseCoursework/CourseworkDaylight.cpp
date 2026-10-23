@@ -10,6 +10,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Components/LightComponent.h"
 #include "HAL/IConsoleManager.h"
+#include "CourseworkClock.h"
 
 ACourseworkDaylight::ACourseworkDaylight()
 {
@@ -70,21 +71,29 @@ bool ACourseworkDaylight::Apply(float Value)
         // Keep irradiance and reflections on the same clock as the moving sun.
         if(auto* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.SkyLight.RealTimeReflectionCapture.TimeSlice")))
         {OriginalSkyTimeSlice=CVar->GetInt();bChangedSkyTimeSlice=OriginalSkyTimeSlice!=0;if(bChangedSkyTimeSlice)CVar->SetWithCurrentPriority(0);}
-        bActive=true;RenderedHour=FMath::Clamp(Value,6.f,22.f);PreviewWeight=0;
+        bActive=true;RenderedHour=float(FCourseworkClock::Wrap(Value));PreviewWeight=0;
         Sky->SetVisibility(true);Sun->SetVisibility(true);SetActorTickEnabled(true);
     }
-    Hour=FMath::Clamp(Value,6.f,22.f);
-    Elevation=FMath::Max(0.f,65.f*FMath::Sin(FMath::Clamp((Hour-6)/12.f,0.f,1.f)*PI));
+    Hour=float(FCourseworkClock::Wrap(Value));
+    Elevation=FMath::Max(0.f,65.f*FMath::Sin((Hour-6)/12.f*PI));
     if(PreviewWeight==0)UpdateLighting();
     return true;
+}
+bool ACourseworkDaylight::Snap(float Value)
+{
+    if(!Apply(Value))return false;
+    RenderedHour=Hour;PreviewWeight=1;UpdateLighting();return true;
 }
 void ACourseworkDaylight::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);if(!bActive)return;
-    const float Delta=Hour-RenderedHour;
+    // Shortest circular distance: 23:59 -> 00:00 must not sweep through noon.
+    float Delta=Hour-RenderedHour;
+    if(Delta>12)Delta-=24;
+    if(Delta< -12)Delta+=24;
     const float Step=Delta*(1-FMath::Exp(-DeltaSeconds/.12f));
-    RenderedHour+=FMath::Clamp(Step,-10.f*DeltaSeconds,10.f*DeltaSeconds);
-    if(FMath::Abs(Hour-RenderedHour)<.0001f)RenderedHour=Hour;
+    RenderedHour=float(FCourseworkClock::Wrap(RenderedHour+FMath::Clamp(Step,-10.f*DeltaSeconds,10.f*DeltaSeconds)));
+    if(FMath::Abs(Delta)<.0001f)RenderedHour=Hour;
     PreviewWeight=FMath::Min(1.f,PreviewWeight+DeltaSeconds*4.f);
     UpdateLighting();
 }

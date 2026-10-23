@@ -4,19 +4,67 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
+
+void ACourseworkHUD::InitializeTimeOfDay()
+{
+    Clock=FCourseworkClock();
+    if(!Daylight)Daylight=GetWorld()->SpawnActor<ACourseworkDaylight>();
+    if(Daylight)Daylight->Snap(float(Clock.Hour));
+    if(TestMode.IsEmpty())if(auto* PC=GetOwningPlayerController())
+        PC->PlayerCameraManager->StartCameraFade(1,0,.7f,FLinearColor::Black,false,false);
+    UE_LOG(LogTemp,Display,TEXT("CLOCK_READY hour=12 day=1 flowing=1 real_minutes_per_day=24"));
+}
+bool ACourseworkHUD::IsTimeSuspended()const
+{
+    // Suspend advancement, never rewrite the user's flowing/fixed choice.
+    return PanelMode==2||PanelMode==3||(PanelMode==9&&ComfortPage==0)||IsSafetyDrillRunning();
+}
+FString ACourseworkHUD::GetTimeStatus()const
+{
+    if(!Clock.bRunning)return TEXT("时间已固定");
+    if(IsSafetyDrillRunning())return TEXT("演练期间暂缓流动");
+    if(PanelMode==9&&ComfortPage==0)return TEXT("调整中，关闭此页后继续");
+    if(PanelMode==2||PanelMode==3)return TEXT("关闭菜单后继续");
+    return TEXT("时间正在流动");
+}
+void ACourseworkHUD::TickTimeOfDay(float Dt)
+{
+    if(!bLightingReady||!IsDaylightActive())return;
+    Clock.Advance(Dt,IsTimeSuspended());
+    Daylight->Apply(float(Clock.Hour));
+}
+bool ACourseworkHUD::SetTimeFlowing(bool Running)
+{
+    if(IsSafetyDrillRunning()){ShowToast(TEXT("演练结束后可调整时间"));return false;}
+    if(!IsDaylightActive()&&!SetDaylightHour(float(Clock.Hour)))return false;
+    Clock.bRunning=Running;
+    UE_LOG(LogTemp,Display,TEXT("CLOCK_FLOW enabled=%d hour=%.5f"),Running,Clock.Hour);
+    return true;
+}
+bool ACourseworkHUD::SetTimeDayMinutes(float Minutes)
+{
+    if(IsSafetyDrillRunning())return false;
+    return Clock.SetDayMinutes(Minutes);
+}
 bool ACourseworkHUD::SetDaylightHour(float Hour)
 {
-    if(IsSafetyDrillRunning()){ShowToast(TEXT("疏散演练期间暂停采光对比"));return false;}
+    if(IsSafetyDrillRunning()){ShowToast(TEXT("疏散演练期间暂停时间调整"));return false;}
     if(!FMath::IsFinite(Hour))return false;
     if(!Daylight)Daylight=GetWorld()->SpawnActor<ACourseworkDaylight>();
     const bool Applied=Daylight&&Daylight->Apply(Hour);
-    if(Applied)UE_LOG(LogTemp,Display,TEXT("ENVIRONMENT_TIME target=%.3f elevation=%.3f smart_scene=%d"),GetDaylightHour(),GetDaylightElevation(),SmartLightingScene);
+    if(Applied)
+    {
+        Clock.Seek(Hour);
+        UE_LOG(LogTemp,Display,TEXT("ENVIRONMENT_TIME target=%.3f elevation=%.3f smart_scene=%d"),GetDaylightHour(),GetDaylightElevation(),SmartLightingScene);
+    }
     return Applied;
 }
-void ACourseworkHUD::RestoreDaylight(){if(Daylight)Daylight->Restore();}
+// Internal cleanup/legacy comparison reset only. The normal UI resets to noon.
+void ACourseworkHUD::RestoreDaylight(){Clock.bRunning=false;if(Daylight)Daylight->Restore();}
 bool ACourseworkHUD::IsDaylightActive()const{return Daylight&&Daylight->IsActive();}
-float ACourseworkHUD::GetDaylightHour()const{return Daylight?Daylight->GetHour():12.f;}
-float ACourseworkHUD::GetDaylightElevation()const{return Daylight?Daylight->GetElevation():65.f;}
+float ACourseworkHUD::GetDaylightHour()const{return float(Clock.Hour);}
+float ACourseworkHUD::GetDaylightElevation()const{return Daylight?Daylight->GetElevation():0.f;}
 bool ACourseworkHUD::NeedsNightLighting()const{return !IsDaylightActive()||GetDaylightElevation()<6.f;}
 void ACourseworkHUD::ObserveDaylight()
 {
