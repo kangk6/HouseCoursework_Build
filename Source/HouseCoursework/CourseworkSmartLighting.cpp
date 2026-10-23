@@ -296,10 +296,10 @@ void ACourseworkHUD::ApplySmartLighting()
 
 FString ACourseworkHUD::GetSmartLightingStatus()const
 {
-    if(SmartLightingScene==1)return NeedsNightLighting()?TEXT("就寝起夜 · 沿途柔光"):TEXT("就寝起夜 · 等待天黑");
-    if(SmartLightingScene==2&&(SmartFixtureOverrides.Contains(StudyDesk)||SmartManualRooms.Contains(4)))return TEXT("阅读助手 · 保留手动照明");
-    if(SmartLightingScene==2)return bSmartReadingOccupied?TEXT("桌边阅读 · 正在补光"):TEXT("阅读助手 · 等你走近书桌");
-    return TEXT("日常手动 · 由你掌控");
+    if(SmartLightingScene==1)return NeedsNightLighting()?TEXT("沿途引路已开启"):TEXT("等待天黑");
+    if(SmartLightingScene==2&&(SmartFixtureOverrides.Contains(StudyDesk)||SmartManualRooms.Contains(4)))return TEXT("已手动接管");
+    if(SmartLightingScene==2)return bSmartReadingOccupied?TEXT("正在补光"):TEXT("等待靠近书桌");
+    return TEXT("日常手动");
 }
 FString ACourseworkHUD::GetSmartLightingDetail()const
 {

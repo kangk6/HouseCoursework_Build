@@ -68,9 +68,9 @@ void ACourseworkHUD::TickEnvironmentRegression()
     case 7:Check(TEXT("1810_hall_lit"),PathLit(8));Shot(TEXT("Environment_1810_hall.png"));Later([this](){SetDaylightHour(12);});break;
     case 8:Check(TEXT("noon_guidance_sleeps"),!NeedsNightLighting()&&!PathLit(8));SetDaylightHour(21);break;
     case 9:Check(TEXT("manual_21_guidance_resumes"),NeedsNightLighting()&&PathLit(8));Shot(TEXT("Environment_21_hall.png"));Check(TEXT("environment_stays_active_until_restored"),IsDaylightActive());Later([this](){SetSmartLightingScene(0);RestoreDaylight();SetPanel(9);});break;
-    case 10:Check(TEXT("environment_restores_exactly"),Daylight->CheckRestored());Check(TEXT("night_preset_pointer"),Overlay->ExerciseControlPointer({770,580})&&GetDaylightHour()==21);SetPanel(6);break;
+    case 10:Check(TEXT("environment_restores_exactly"),Daylight->CheckRestored());Check(TEXT("night_dial_pointer"),Overlay->ExerciseTimeSelection(21)&&GetDaylightHour()==21);SetPanel(6);break;
     case 11:Check(TEXT("switching_tab_does_not_change_clock"),GetDaylightHour()==21);SetPanel(9);break;
-    case 12:Check(TEXT("slider_1810_pointer"),Overlay->ExerciseControlPointer({708.75f,470})&&FMath::IsNearlyEqual(GetDaylightHour(),18+10.f/60,.001f));SetPanel(6);break;
+    case 12:Check(TEXT("dial_1810_pointer"),Overlay->ExerciseTimeSelection(18+10.f/60)&&FMath::IsNearlyEqual(GetDaylightHour(),18+10.f/60,.001f));SetPanel(6);break;
     case 13:Check(TEXT("night_scene_pointer_after_slider"),Overlay->ExerciseControlPointer({1040,380})&&SmartLightingScene==1&&NeedsNightLighting());SetPanel(0);SetDaylightHour(21);TriggerKitchenAlarm();Check(TEXT("night_fire_keeps_clock_and_exits_smart"),GetDaylightHour()==21&&SmartLightingScene==0&&IsSafetyDrillRunning());break;
     case 14:Check(TEXT("night_fire_has_no_unbuilt_lighting"),GetWorld()->NumLightingUnbuiltObjects==0);if(GetWorld()->NumLightingUnbuiltObjects)PC->ConsoleCommand(TEXT("DumpUnbuiltLightInteractions"),true);ResetKitchenAlarm();RestoreDaylight();Check(TEXT("night_fire_reset_keeps_night_selection"),GetDaylightHour()==21);break;
     case 15:Check(TEXT("entrance_leaf_found"),R.Door.IsValid());AimDoor(0,0);break;

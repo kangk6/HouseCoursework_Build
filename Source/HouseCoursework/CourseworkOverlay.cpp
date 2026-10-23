@@ -111,7 +111,7 @@ void UCourseworkOverlay::NativeOnInitialized()
     auto* Content = WidgetTree->ConstructWidget<UVerticalBox>();
     Panel->AddChild(Content);
     auto* Eyebrow=MakeText(WidgetTree,TEXT("HOUSE  /  住宅交互演示"),12);Eyebrow->SetColorAndOpacity(FSlateColor(FLinearColor(.58f,.46f,.28f)));
-    Content->AddChildToVerticalBox(Eyebrow)->SetPadding(FMargin(0,0,0,12));
+    Eyebrow->SetVisibility(ESlateVisibility::Collapsed);
     PanelTitle = MakeText(WidgetTree, TEXT(""), 30);
     Content->AddChildToVerticalBox(PanelTitle)->SetPadding(FMargin(0, 0, 0, 12));
     PanelTabs=WidgetTree->ConstructWidget<UHorizontalBox>();Content->AddChildToVerticalBox(PanelTabs)->SetPadding(FMargin(0,6,0,22));
@@ -130,6 +130,9 @@ void UCourseworkOverlay::NativeOnInitialized()
     ControlMenu->Configure(OwnerHUD);
     auto* ControlSlot=Root->AddChildToCanvas(ControlMenu);
     ControlSlot->SetAnchors(FAnchors(0,0,1,1));ControlSlot->SetOffsets(FMargin(0));ControlSlot->SetZOrder(3);
+    StartupCover=WidgetTree->ConstructWidget<UBorder>();StartupCover->SetBrushColor(FLinearColor::Black);
+    auto* CoverSlot=Root->AddChildToCanvas(StartupCover);CoverSlot->SetAnchors(FAnchors(0,0,1,1));CoverSlot->SetOffsets(FMargin(0));CoverSlot->SetZOrder(100);
+    StartupCover->SetVisibility(OwnerHUD&&OwnerHUD->IsStartupCovered()?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     RefreshPanel();
 }
 
@@ -142,6 +145,7 @@ void UCourseworkOverlay::NativeConstruct()
 void UCourseworkOverlay::NativeTick(const FGeometry& Geometry,float DeltaTime)
 {
     Super::NativeTick(Geometry,DeltaTime);
+    if(StartupCover&&OwnerHUD)StartupCover->SetVisibility(OwnerHUD->IsStartupCovered()?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     if(SafetyBanner && OwnerHUD)
     {
         SafetyBanner->SetVisibility(OwnerHUD->GetSafetyState()!=0 && OwnerHUD->GetPanel()==0?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
@@ -159,6 +163,7 @@ void UCourseworkOverlay::NativeTick(const FGeometry& Geometry,float DeltaTime)
 void UCourseworkOverlay::SetOwnerHUD(ACourseworkHUD* Value)
 {
     OwnerHUD=Value;
+    if(StartupCover)StartupCover->SetVisibility(Value&&Value->IsStartupCovered()?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     if(MiniMap) MiniMap->Configure(Value,false);
     if(ExpandedMap) ExpandedMap->Configure(Value,true);
     if(ControlMenu) ControlMenu->Configure(Value);
@@ -201,6 +206,7 @@ void UCourseworkOverlay::RefreshPanel()
         LightSlider=nullptr;LightValue=nullptr;
         return;
     }
+    PanelBody->SetVisibility(Mode==3?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     PanelTabs->ClearChildren();PanelTabs->SetVisibility((Mode==1||Mode==4||Mode==6)?ESlateVisibility::Visible:ESlateVisibility::Collapsed);
     LightSlider=nullptr;LightValue=nullptr;
     if(Mode==1||Mode==4||Mode==6)
@@ -227,18 +233,16 @@ void UCourseworkOverlay::RefreshPanel()
     else if (Mode == 2)
     {
         PanelTitle->SetText(FText::FromString(TEXT("已暂停")));
-        PanelBody->SetText(FText::FromString(TEXT("参观已暂停。选择继续或返回入口。")));
-        AddButton(TEXT("继续参观  ·  Esc"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, ClosePanel));
-        AddButton(TEXT("回到入口"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, Entrance));
+        PanelBody->SetText(FText::GetEmpty());
+        AddButton(TEXT("继续参观"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, ClosePanel));
         AddButton(TEXT("操作帮助"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, Help));
         AddButton(TEXT("退出程序"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, Quit));
     }
     else if (Mode == 3)
     {
         PanelTitle->SetText(FText::FromString(TEXT("开始参观")));
-        PanelBody->SetText(FText::FromString(TEXT("W / A / S / D：移动    鼠标：观察\nE：操作准星指向的门、冰箱、抽屉或灯具\n灯具：短按 E 开关；按住 E 滚轮调光，Shift 细调\nM：楼层地图    Tab：控制面板    Esc：暂停 / 返回\n\n左下地图显示所在楼层、位置与朝向。\n右下出现对象提示后，按 E 操作。\n进入推拉门时，从打开的门洞通过。\n上下楼从台阶中间行走，避免贴着扶手。")));
-        AddButton(TEXT("开始 / 继续参观"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, ClosePanel));
-        AddButton(TEXT("地点导航"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, Back));
+        PanelBody->SetText(FText::FromString(TEXT("WASD 移动    鼠标观察\nE 操作物件    按住 E 滚轮调光\nM 地图    Tab 控制面板    Esc 暂停")));
+        AddButton(TEXT("开始参观"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, ClosePanel));
     }
     else if (Mode == 4)
     {
@@ -293,13 +297,13 @@ void UCourseworkOverlay::RefreshPanel()
             auto* Height=WidgetTree->ConstructWidget<USizeBox>(); Height->SetHeightOverride(38);
             auto* Button=WidgetTree->ConstructWidget<UButton>();
             Button->SetBackgroundColor(OwnerHUD->GetMapFloor()==Floor?FLinearColor(.16f,.17f,.15f):FLinearColor(.045f,.048f,.045f));
-            const FString Label=(OwnerHUD->GetMapFloor()==Floor?TEXT("● "):TEXT("○ "))+FString(Floor==0?TEXT("一楼  ·  1"):TEXT("二楼  ·  2"));
+            const FString Label=(OwnerHUD->GetMapFloor()==Floor?TEXT("● "):TEXT("○ "))+FString(Floor==0?TEXT("一楼"):TEXT("二楼"));
             auto* Text=MakeText(WidgetTree,Label,17); Text->SetJustification(ETextJustify::Center); Button->AddChild(Text);
             FScriptDelegate Click; Click.BindUFunction(this,Floor==0?GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay,FloorOne):GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay,FloorTwo)); Button->OnClicked.Add(Click);
             Height->AddChild(Button);
             auto* FloorSlot=Floors->AddChildToHorizontalBox(Height); FloorSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill)); FloorSlot->SetPadding(FMargin(Floor==0?0:4,0,Floor==0?4:0,0));
         }
-        AddButton(TEXT("返回参观  ·  M / Esc"),GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay,ClosePanel));
+        AddButton(TEXT("返回"),GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay,ClosePanel));
     }
 }
 
@@ -372,6 +376,11 @@ void UCourseworkOverlay::FloorTwo() { if(OwnerHUD) OwnerHUD->SelectMapFloor(1); 
 void UCourseworkOverlay::Lights(){if(OwnerHUD)OwnerHUD->SetPanel(6);}
 void UCourseworkOverlay::ShowLightingRoom(int32 Room){LightingRoom=CourseworkRooms::Clamp(Room);if(ControlMenu)ControlMenu->SelectRoom(LightingRoom);RefreshPanel();}
 bool UCourseworkOverlay::ExerciseControlPointer(FVector2D Position){return ControlMenu && ControlMenu->ExercisePointer(Position);}
+bool UCourseworkOverlay::ExerciseTimeSelection(float Hour)
+{
+    const float A=Hour*2*PI/24+PI/2;
+    return ExerciseControlPointer(FVector2D(930+220*FMath::Cos(A),440+220*FMath::Sin(A)))&&ExerciseControlPointer(FVector2D(1350,750));
+}
 void UCourseworkOverlay::LivingLights(){ShowLightingRoom(0);}
 void UCourseworkOverlay::BedroomLights(){ShowLightingRoom(1);}
 void UCourseworkOverlay::ToggleLights(){const bool On=OwnerHUD->IsRoomLightOn(LightingRoom);OwnerHUD->SetRoomLighting(LightingRoom,!On,On?OwnerHUD->GetRoomBrightness(LightingRoom):OwnerHUD->GetRoomRestoreBrightness(LightingRoom));RefreshPanel();}

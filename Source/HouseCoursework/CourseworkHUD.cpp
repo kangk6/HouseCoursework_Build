@@ -47,6 +47,9 @@ void ACourseworkHUD::BeginPlay()
     Super::BeginPlay();
     auto* PC = GetOwningPlayerController();
     if (!PC) return;
+    FString StartupTest;FParse::Value(FCommandLine::Get(),TEXT("HouseTest="),StartupTest);
+    bStartupCover=StartupTest.IsEmpty()||StartupTest==TEXT("startup");
+    if(bStartupCover)PC->PlayerCameraManager->SetManualCameraFade(1,FLinearColor::Black,false);
     EnableInput(PC);
     auto& Tab = InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &ACourseworkHUD::ToggleControls);
     Tab.bExecuteWhenPaused = true;
@@ -127,7 +130,6 @@ void ACourseworkHUD::BeginPlay()
     Overlay->SetOwnerHUD(this);
     Overlay->AddToViewport(20);
     FParse::Value(FCommandLine::Get(), TEXT("HouseTest="), TestMode);
-    if(TestMode.IsEmpty())PC->PlayerCameraManager->StartCameraFade(1,1,0,FLinearColor::Black,false,true);
     TestStartTime = GetWorld()->GetRealTimeSeconds();
     if(TestMode.StartsWith(TEXT("perf_")))
     {
@@ -205,6 +207,7 @@ void ACourseworkHUD::SetPanel(int32 NewPanel)
     else PC->SetInputMode(FInputModeGameOnly());
     PC->SetPause(NewPanel == 2);
     PanelMode = NewPanel;
+    ++TimeEditorRevision;
     if (Overlay) Overlay->RefreshPanel();
     UE_LOG(LogTemp, Display, TEXT("COURSEWORK_PANEL %d MOVE_BLOCKED=%d CURSOR=%d"), PanelMode, bMenuInputBlocked, PC->bShowMouseCursor);
 }
@@ -235,6 +238,12 @@ void ACourseworkHUD::SelectMapFloor(int32 Floor)
 void ACourseworkHUD::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if(bStartupCover&&StartupRevealAt>0&&GetWorld()->GetRealTimeSeconds()>=StartupRevealAt)
+    {
+        bStartupCover=false;
+        GetOwningPlayerController()->PlayerCameraManager->StartCameraFade(1,0,.4f,FLinearColor::Black,false,false);
+        UE_LOG(LogTemp,Display,TEXT("STARTUP_NOON_REVEALED hour=%.4f"),GetDaylightHour());
+    }
     HintElapsed += DeltaSeconds;
     TickTimeOfDay(DeltaSeconds);
     TickSafety(DeltaSeconds);
@@ -243,7 +252,8 @@ void ACourseworkHUD::Tick(float DeltaSeconds)
     TickLightInteraction();
     if (PanelMode == 0 && HintElapsed >= 0.075f) { HintElapsed = 0; UpdateInteraction(); }
     if (Overlay && GetWorld()->GetRealTimeSeconds() > ToastUntil) Overlay->SetToast(TEXT(""));
-    if (!TestMode.IsEmpty()) TickAcceptanceTest();
+    if(TestMode==TEXT("startup"))TickStartupAcceptance();
+    else if (!TestMode.IsEmpty()) TickAcceptanceTest();
 }
 
 void ACourseworkHUD::UpdateInteraction()
@@ -477,6 +487,7 @@ void ACourseworkHUD::TickAcceptanceTest()
     if(TestMode==TEXT("ventilation_perf")){TickVentilationPerformance();return;}
     if(TestMode==TEXT("ventilation")||TestMode==TEXT("ventilation_view")){TickVentilationAcceptance();return;}
     if(TestMode==TEXT("clock")){TickClockAcceptance();return;}
+    if(TestMode==TEXT("dial")){TickDialAcceptance();return;}
     if(TestMode==TEXT("daylight_sweep")){TickDaylightSweep();return;}
     if(TestMode==TEXT("daylight")){TickDaylightAcceptance();return;}
     if(TestMode==TEXT("energy")){TickEnergyAcceptance();return;}

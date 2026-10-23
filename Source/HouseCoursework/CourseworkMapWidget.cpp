@@ -188,7 +188,7 @@ public:
                 Box(LabelAt-FVector2D(2),{float(Label.Len()*15+8),23},FLinearColor(.01f,.015f,.018f,.97f),Layer+9);
                 EnergyText(LabelAt,Label,Active?Paper:Idle);
             }
-            EnergyText({14,Size.Y-32},TEXT("照明用电流向示意 · 箭头随功率变化，关灯停止 · 模拟估算"),Paper);
+            EnergyText({14,Size.Y-32},TEXT("照明用电估算"),Paper);
         }
         if(!Owner.IsValid() || Owner->GetPlayerFloor()==Floor)
         {
@@ -253,7 +253,7 @@ public:
             Text({14,12},Floor==0?TEXT("一楼 / 1F"):TEXT("二楼 / 2F"),14,Paper,Layer+10);
             Box({Size.X-164,8},{152,31},FLinearColor(.05f,.065f,.07f,.95f),Layer+10);
             Text({Size.X-155,14},Owner->IsSafetyDrillRunning()?TEXT("疏散优先"):Owner->IsEnergyMapLayer()?TEXT("G  返回导航图"):TEXT("G  查看用电流向"),11,Paper,Layer+11);
-            if(!Owner->IsEnergyMapLayer())Text({14,Size.Y-25},Owner.IsValid()&&Owner->IsSafetyDrillRunning()?TEXT("绿线：集合路线 · 菱形：住户 · 房门按 E 操作  /  1、2 切换楼层"):TEXT("选择地点前往    /    1、2 切换楼层"),12,MapMuted,Layer+10);
+
         }
         else
         {

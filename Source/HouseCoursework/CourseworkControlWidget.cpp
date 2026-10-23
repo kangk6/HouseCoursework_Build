@@ -74,36 +74,47 @@ public:
     float Scale(const FGeometry& G) const { return FMath::Min(G.GetLocalSize().X/1600.f,G.GetLocalSize().Y/900.f); }
     FVector2D Origin(const FGeometry& G) const { return (G.GetLocalSize()-FVector2D(1600,900)*Scale(G))*.5f; }
     FVector2D DesignPoint(const FGeometry& G,FVector2D Absolute) const { return (G.AbsoluteToLocal(Absolute)-Origin(G))/Scale(G); }
+    void SyncTimeDraft()const
+    {
+        if(Owner.IsValid()&&DraftRevision!=Owner->GetTimeEditorRevision())
+        {DraftRevision=Owner->GetTimeEditorRevision();DraftHour=Owner->GetDaylightHour();DraftFixed=!Owner->IsTimeFlowing();}
+    }
+    void DialAt(FVector2D P)
+    {
+        SyncTimeDraft();const FVector2D D=P-FVector2D(930,440);
+        if(D.SizeSquared()<80*80)return;
+        const float H=float(FCourseworkClock::Wrap((FMath::Atan2(D.Y,D.X)-PI/2)*24/(2*PI)));
+        DraftHour=float(FCourseworkClock::Wrap(FMath::RoundToInt(H*60)/60.0));
+        Invalidate(EInvalidateWidgetReason::Paint);
+    }
     TArray<FControlHit> Targets() const
     {
         TArray<FControlHit> H;
         auto Add=[&](float X,float Y,float R,float B,int32 A){H.Add({FSlateRect(X,Y,R,B),A});};
-        Add(286,16,376,85,6);Add(406,16,496,85,7);Add(526,16,616,85,8);Add(646,16,736,85,9);Add(1280,16,1400,78,101);Add(1480,16,1544,78,4);Add(46,838,178,898,100);Add(1420,838,1554,898,100);
+        Add(286,16,376,85,6);Add(406,16,496,85,7);Add(526,16,616,85,8);Add(646,16,736,85,9);Add(1280,16,1400,78,101);Add(1480,16,1544,78,4);Add(1420,838,1554,898,100);
         if(!Owner.IsValid()) return H;
         const int32 Mode=Owner->GetPanel();
-        if(Mode==6){for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,CourseworkRooms::RowY(I),246,CourseworkRooms::RowY(I)+62,110+CourseworkRooms::DisplayOrder[I]);Add(296,455,690,535,200);Add(456,575,568,625,210);Add(568,575,682,625,211);Add(296,706,524,758,212);for(int32 I=0;I<3;++I)Add(1004+180*I,119,1176+180*I,169,213+I);}
-        if(Mode==6){Add(1340,253,1516,305,700);Add(904,342,1198,420,701);Add(1214,342,1516,420,702);}
+        if(Mode==6){for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,CourseworkRooms::RowY(I),246,CourseworkRooms::RowY(I)+62,110+CourseworkRooms::DisplayOrder[I]);Add(296,455,690,535,200);Add(456,575,682,625,211);for(int32 I=0;I<2;++I)Add(1004+180*I,119,1176+180*I,169,213+I);}
+        if(Mode==6){Add(904,342,1198,420,701);Add(1214,342,1516,420,702);}
         if(Mode==8)
         {
             for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,CourseworkRooms::RowY(I),246,CourseworkRooms::RowY(I)+62,110+CourseworkRooms::DisplayOrder[I]);
             Add(300,650,472,708,500);Add(484,650,656,708,501);Add(668,650,840,708,502);Add(1050,650,1300,708,503);
-            Add(300,570,600,612,506);
             for(int32 I=0;I<3;++I)Add(1130+92*I,195,1212+92*I,233,510+I);
         }
         if(Mode==9){Add(48,195,246,242,640);Add(48,247,246,294,641);}
-        if(Mode==9&&Owner->GetComfortPage()==1){for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,320+49*I,246,367+49*I,110+CourseworkRooms::DisplayOrder[I]);Add(300,552,550,608,650);Add(566,552,816,608,651);Add(1050,686,1380,742,652);Add(566,686,816,742,653);Add(300,686,550,742,654);}
-        if(Mode==9&&Owner->GetComfortPage()==0){Add(296,435,844,505,600);for(int32 I=0;I<4;++I)Add(300+136*I,552,428+136*I,608,610+I);Add(300,686,560,742,620);Add(1050,686,1380,742,621);Add(300,622,560,670,624);Add(580,622,840,670,625);for(int32 I=0;I<3;++I)Add(1050+112*I,520,1154+112*I,568,630+I);}
+        if(Mode==9&&Owner->GetComfortPage()==1){for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,320+49*I,246,367+49*I,110+CourseworkRooms::DisplayOrder[I]);Add(300,552,550,608,650);Add(1050,552,1380,608,652);}
+        if(Mode==9&&Owner->GetComfortPage()==0){SyncTimeDraft();Add(780,725,1070,777,624);Add(1250,725,1460,777,626);}
         if(Mode==1) for(int32 I=0;I<6;++I) Add(300,288+I*64,682,347+I*64,300+I);
         if(Mode==4){Add(296,325,690,395,220);Add(296,496,690,566,221);}
-        if(Mode==7){for(int32 I=0;I<3;++I)Add(300+180*I,585,470+180*I,641,400+I);Add(300,695,560,751,403);}
+        if(Mode==7){Add(300,585,560,641,!Owner->IsSafetyDrillRunning()?400:Owner->GetSafetyState()==3?401:402);if(Owner->IsSafetyDrillRunning())Add(300,695,560,751,403);}
         return H;
     }
-    int32 Hit(FVector2D P) const { for(const auto& H:Targets()) if(H.Rect.ContainsPoint(P))return H.Action;return INDEX_NONE; }
+    int32 Hit(FVector2D P) const { if(Owner.IsValid()&&Owner->GetPanel()==9&&Owner->GetComfortPage()==0){const float R=FVector2D::Distance(P,FVector2D(930,440));if(R>=140&&R<=258)return 600;}for(const auto& H:Targets()) if(H.Rect.ContainsPoint(P))return H.Action;return INDEX_NONE; }
     void ValueAt(int32 Action,float X)
     {
         if(!Owner.IsValid())return;
         const float T=FMath::Clamp((X-300.f)/382.f,0.f,1.f);
-        if(Action==600){const float DayT=FMath::Clamp((X-300.f)/540.f,0.f,1.f);Owner->SetDaylightHour(FMath::Min(DayT*24.f,1439.f/60.f));}
         if(Action==200) Owner->SetRoomLighting(Room,T>0,T);
         if(Action==220)Owner->ApplySensitivity(.25f+1.75f*T);
         if(Action==221)Owner->ApplySpeed(.5f+1.5f*T);
@@ -117,19 +128,20 @@ public:
         else if(A==101)Owner->ToggleMap();
         else if(A==100)Owner->SetPanel(0);
         else if(A>=110&&A<110+CourseworkRooms::Count)Room=A-110;
-        else if(A==210||A==211)Owner->SetRoomLighting(Room,A==211,Owner->GetSmartLightingScene()?Owner->GetRoomRestoreBrightness(Room):(Owner->IsRoomLightOn(Room)?Owner->GetRoomBrightness(Room):Owner->GetRoomRestoreBrightness(Room)));
+        else if(A==211)Owner->SetRoomLighting(Room,!Owner->IsRoomLightOn(Room),Owner->GetSmartLightingScene()?Owner->GetRoomRestoreBrightness(Room):(Owner->IsRoomLightOn(Room)?Owner->GetRoomBrightness(Room):Owner->GetRoomRestoreBrightness(Room)));
         else if(A==212)Owner->ResetRoomLighting(Room);
         else if(A==213||A==214)Owner->SetAllRoomLighting(A==213);
         else if(A==215)Owner->ResetAllRoomLighting();
-        else if(A>=700&&A<=702){Owner->SetSmartLightingScene(A-700);if(A==702)Room=4;}
+        else if(A==701||A==702){const int32 Scene=A-700;Owner->SetSmartLightingScene(Owner->GetSmartLightingScene()==Scene?0:Scene);if(A==702)Room=4;}
         else if(A>=610&&A<=613){const float Hours[]={8,12,17,21};Owner->SetDaylightHour(Hours[A-610]);}
         else if(A==640||A==641)Owner->SelectComfortPage(A-640);
-        else if(A==650||A==651)Owner->SetRoomWindows(Room,A==650);
+        else if(A==650)Owner->SetRoomWindows(Room,Owner->GetRoomOpenWindowCount(Room)==0);
         else if(A==652)Owner->ToggleAirflowDisplay();
         else if(A==653)Owner->CloseAllWindows();
         else if(A==654&&Owner->GetRoomWindowCount(Room)>0)Owner->ObserveVentilation(Room);
         else if(A==620)Owner->SetDaylightHour(12);
-        else if(A==624||A==625)Owner->SetTimeFlowing(A==624);
+        else if(A==624){SyncTimeDraft();DraftFixed=!DraftFixed;}
+        else if(A==626){SyncTimeDraft();if(!Owner->IsSafetyDrillRunning()&&Owner->SetDaylightHour(DraftHour))Owner->SetTimeFlowing(!DraftFixed);}
         else if(A>=630&&A<=632){const float Minutes[]={6,24,60};Owner->SetTimeDayMinutes(Minutes[A-630]);}
         else if(A==621)Owner->ObserveDaylight();
         else if(A==500||A==501)Owner->ApplyEnergyScenario(A==501);
@@ -143,7 +155,8 @@ public:
         else if(A==403)Owner->ToggleMap();
         else if(A>=300&&A<=304)Owner->GoToLocation(A-300);
         else if(A==305)Owner->SetPanel(3);
-        else if(A==200||A==220||A==221||A==600)ValueAt(A,P.X);
+        else if(A==600)DialAt(P);
+        else if(A==200||A==220||A==221)ValueAt(A,P.X);
         Invalidate(EInvalidateWidgetReason::Paint);return true;
     }
     virtual FReply OnMouseButtonDown(const FGeometry& G,const FPointerEvent& E) override
@@ -159,13 +172,13 @@ public:
     virtual FReply OnMouseButtonUp(const FGeometry& G,const FPointerEvent& E) override
     {
         if(E.GetEffectingButton()!=EKeys::LeftMouseButton)return FReply::Unhandled();
-        if(Drag>=0)ValueAt(Drag,DesignPoint(G,E.GetScreenSpacePosition()).X);
+        if(Drag==600)DialAt(DesignPoint(G,E.GetScreenSpacePosition()));else if(Drag>=0)ValueAt(Drag,DesignPoint(G,E.GetScreenSpacePosition()).X);
         Drag=INDEX_NONE;return FReply::Handled().ReleaseMouseCapture();
     }
     virtual FReply OnMouseMove(const FGeometry& G,const FPointerEvent& E) override
     {
         const FVector2D P=DesignPoint(G,E.GetScreenSpacePosition());Hover=Hit(P);
-        if(Drag>=0)ValueAt(Drag,P.X);
+        if(Drag==600)DialAt(P);else if(Drag>=0)ValueAt(Drag,P.X);
         Invalidate(EInvalidateWidgetReason::Paint);return FReply::Handled();
     }
     virtual void OnMouseLeave(const FPointerEvent& E) override { Hover=INDEX_NONE;Invalidate(EInvalidateWidgetReason::Paint);SLeafWidget::OnMouseLeave(E); }
@@ -175,7 +188,7 @@ public:
         if(!Owner.IsValid())return FReply::Unhandled();
         if(E.GetKey()==EKeys::Tab||E.GetKey()==EKeys::Escape){Owner->SetPanel(0);return FReply::Handled();}
         if(Owner->GetPanel()==9&&Owner->GetComfortPage()==0&&(E.GetKey()==EKeys::Left||E.GetKey()==EKeys::Right))
-        {Owner->SetDaylightHour(Owner->GetDaylightHour()+(E.GetKey()==EKeys::Right?.25f:-.25f));Invalidate(EInvalidateWidgetReason::Paint);return FReply::Handled();}
+        {SyncTimeDraft();DraftHour=float(FCourseworkClock::Wrap(DraftHour+(E.GetKey()==EKeys::Right?.25f:-.25f)));Invalidate(EInvalidateWidgetReason::Paint);return FReply::Handled();}
         if(Owner->GetPanel()==6)
         {
             if(E.GetKey()==EKeys::Up||E.GetKey()==EKeys::Down){Room=CourseworkRooms::DisplayOrder[(CourseworkRooms::DisplayIndex(Room)+CourseworkRooms::Count+(E.GetKey()==EKeys::Down?1:-1))%CourseworkRooms::Count];Invalidate(EInvalidateWidgetReason::Paint);return FReply::Handled();}
@@ -270,10 +283,11 @@ public:
         TArray<FSlateGradientStop> Stops;
         for(int32 I=0;I<=16;++I){const float X=100.f*I;Stops.Emplace(FVector2f(X,0),FLinearColor(.006f,.008f,.012f,.97f*(1.f-FMath::SmoothStep(590.f,1000.f,X))));}
         FSlateDrawElement::MakeGradient(Out,Layer,G.ToPaintGeometry(FVector2D(1600,900),FSlateLayoutTransform(S,O)),Stops,Orient_Vertical);
+        Box(0,86,1600,738,FLinearColor(.006f,.010f,.016f,.58f));
         Box(0,0,1600,86,FLinearColor(0,0,0,.78f));Line({{0,86},{1600,86}},FLinearColor(.5f,.5f,.48f,.25f));
         const FVector2D HeaderInk=InkBounds(TEXT("住宅控制"),FontFor(23,true));
         Text(56,43-(HeaderInk.X+HeaderInk.Y)*.5f,TEXT("住宅控制"),23,Ivory,true);Line({{227,33},{227,61}},Muted);
-        const int32 Modes[]={6,7,8,9};const TCHAR* Tabs[]={TEXT("智慧"),TEXT("安全"),TEXT("能源"),TEXT("舒适")};
+        const int32 Modes[]={6,7,8,9};const TCHAR* Tabs[]={TEXT("智慧"),TEXT("安全"),TEXT("绿色"),TEXT("舒适")};
         for(int32 I=0;I<4;++I){const float X=300+120.f*I;const bool Selected=Mode==Modes[I];if(Hover==Modes[I])Box(X-14,16,86,62,FLinearColor(1,1,1,.045f));const FVector2D TabInk=InkBounds(Tabs[I],FontFor(20));Text(X,43-(TabInk.X+TabInk.Y)*.5f,Tabs[I],20,Selected?Ivory:Muted);if(Selected)Box(X-10,82,66,3,Gold);}
         if(Hover==101)Box(1280,16,120,62,FLinearColor(1,1,1,.045f));
         CenterText(FSlateRect(1280,16,1400,78),TEXT("地图  M"),16,Hover==101?Ivory:Muted);
@@ -288,17 +302,17 @@ public:
         if(Mode==6)
         {
             int32 EnabledRooms=0;for(int32 I=0;I<CourseworkRooms::Count;++I)if(Owner->IsRoomLightOn(I))++EnabledRooms;
-            Box(884,108,660,98,FLinearColor(.012f,.016f,.020f,.88f));
-            Text(904,125,TEXT("全屋"),17,Ivory);Text(904,164,FString::Printf(TEXT("%d / %d"),EnabledRooms,CourseworkRooms::Count),12,Gold,false,true);
+            Box(884,108,660,78,FLinearColor(.012f,.016f,.020f,.88f));
+            Text(904,132,TEXT("全屋"),17,Ivory);
             const TCHAR* WholeLabels[]={TEXT("全部开启"),TEXT("全部关闭"),TEXT("恢复默认")};
-            for(int32 I=0;I<3;++I)
+            for(int32 I=0;I<2;++I)
             {
                 const float X=1004+180.f*I;const bool Active=(I==0&&EnabledRooms==CourseworkRooms::Count)||(I==1&&EnabledRooms==0);
                 if(Active||Hover==213+I)Box(X,119,172,50,FLinearColor(Gold.R,Gold.G,Gold.B,.12f));
                 Rect(X,119,172,50,Active||Hover==213+I?Gold:Muted);
                 CenterText(FSlateRect(X,119,X+172,169),WholeLabels[I],16,Active?Gold:Ivory);
             }
-            Text(1004,177,Owner->GetLightingSaveStatus(),13,Muted);
+            if(Owner->GetLightingSaveStatus().Contains(TEXT("失败")))Text(1004,177,TEXT("灯光保存失败"),13,Gold);
             Text(56,154,TEXT("房间"),17,Muted);
             for(int32 I=0;I<CourseworkRooms::Count;++I)
             {
@@ -309,8 +323,8 @@ public:
                 if(Owner->IsRoomLightOn(ID))Box(232,Y+28,3,6,Selected?Ink:Gold);
             }
             const auto& SelectedRoom=CourseworkRooms::Get(Room);
-            Text(300,160,FString::Printf(TEXT("%s  /  %s"),SelectedRoom.Name,SelectedRoom.Floor),14,Muted);
-            Text(300,197,TEXT("室内灯光"),34,Ivory,true);
+
+            Text(300,197,SelectedRoom.Name,34,Ivory,true);
             Text(300,314,Owner->GetSmartLightingScene()?TEXT("区域等效亮度"):TEXT("亮度"),17,Muted);
             const bool On=Owner->IsRoomLightOn(Room);const float Brightness=On?Owner->GetRoomBrightness(Room):Owner->GetRoomRestoreBrightness(Room);
             const FString Number=FString::FromInt(FMath::RoundToInt((On?Brightness:0)*100));
@@ -321,20 +335,12 @@ public:
             TArray<FVector2D> Circle;for(int32 I=0;I<=32;++I){const float A=I*2*PI/32;Circle.Add(FVector2D(648+15*FMath::Cos(A),393+15*FMath::Sin(A)));}Line(Circle,On?Gold:Muted,1.5f);
             for(int32 I=0;I<8;++I){const float A=I*PI/4;Line({{648+23*FMath::Cos(A),393+23*FMath::Sin(A)},{648+30*FMath::Cos(A),393+30*FMath::Sin(A)}},On?Gold:Muted,1.5f);}
             Slider(477,On?Brightness:0,true);Text(300,503,TEXT("0%"),13,Muted,false,true);Text(652,503,TEXT("100%"),13,Muted,false,true);
-            Line({{303,606},{309,583},{323,583},{329,606},{303,606},{316,606},{316,620},{309,620},{323,620}},On?Gold:Muted,1.5f);Text(349,583,TEXT("照明"),19,Ivory);
-            Rect(456,575,226,50,FLinearColor(.37f,.39f,.39f));Box(On?569:457,576,112,48,Ivory);
-            if(Hover==210||Hover==211)Rect(Hover==210?456:569,575,113,50,Gold);
-            CenterText(FSlateRect(456,575,569,625),TEXT("关"),18,On?Muted:Ink);CenterText(FSlateRect(569,575,682,625),TEXT("开"),18,On?Ink:Muted);
-            if(Hover==212)Box(296,706,228,52,FLinearColor(1,1,1,.05f));
-            TArray<FVector2D> Arc;for(int32 I=0;I<=20;++I){const float A=-PI*.9f+I*PI*1.75f/20;Arc.Add(FVector2D(313+11*FMath::Cos(A),731+11*FMath::Sin(A)));}Line(Arc,Muted,1.5f);Line({{300,718},{301,729},{311,727}},Muted,1.5f);Text(349,716,TEXT("房间复位"),17,Muted);
-            if(!On)Text(300,651,FString::Printf(TEXT("再次开启恢复至 %d%%"),FMath::RoundToInt(Brightness*100)),13,Muted);
+            Rect(456,575,226,50,On?Gold:Muted);CenterText(FSlateRect(456,575,682,625),On?TEXT("关闭照明"):TEXT("开启照明"),18,On?Gold:Ivory);
             // Lifestyle controls occupy the existing unused right column.
             // Keep the established typefaces, margins and understated palette.
-            Box(884,238,660,558,FLinearColor(.012f,.016f,.020f,.90f));
+            Box(884,238,660,Owner->GetSmartLightingScene()?310:210,FLinearColor(.012f,.016f,.020f,.90f));
             Text(906,260,TEXT("生活照明"),27,Ivory,true);
             const int32 Scene=Owner->GetSmartLightingScene();
-            Rect(1340,253,176,52,Hover==700?Gold:Muted);
-            CenterText(FSlateRect(1340,253,1516,305),Scene?TEXT("退出场景"):TEXT("日常手动"),16,Scene?Ivory:Muted);
             const TCHAR* SceneNames[]={TEXT("就寝起夜"),TEXT("阅读助手")};
             for(int32 I=0;I<2;++I)
             {
@@ -343,16 +349,8 @@ public:
                 Rect(X,342,W,78,Selected?Gold:Muted);
                 CenterText(FSlateRect(X,342,X+W,420),SceneNames[I],22,Selected?Gold:Ivory);
             }
-            Text(906,462,Owner->GetSmartLightingStatus(),20,Scene?Gold:Ivory);
-            Text(906,508,Owner->GetSmartLightingDetail(),15,Muted);
-            const bool Reading=Scene==2;
-            const float Live=Scene?(Reading?Owner->GetSmartFixtureLevel(FName(TEXT("SM_TableLamp_A1_32"))):Owner->GetSmartRoomLevel(8)):0;
-            Text(906,572,Reading?TEXT("书房台灯"):TEXT("走廊灯具等效亮度"),16,Ivory);
-            Text(1360,572,FString::Printf(TEXT("%d %%"),FMath::RoundToInt(Live*100)),19,Scene?Gold:Muted,false,true);
-            Box(906,612,608,2,FLinearColor(.22f,.24f,.25f));if(Live>0)Box(906,612,608*Live,2,Gold);
-            Text(906,651,Scene?FString::Printf(TEXT("手动优先  ·  已接管 %d 项"),Owner->GetSmartManualCount()):TEXT("起夜按路引光  /  阅读只补亮桌面"),15,Muted);
-            Text(906,703,TEXT("场景中按 E 可单独控制灯具"),14,Muted);
-            Text(906,738,TEXT("自动变化不写入日常配置  ·  感知为场景模拟"),13,Muted);
+            if(Scene)Text(906,462,Owner->GetSmartLightingStatus(),20,Gold);
+
         }
         else if(Mode==8)
         {
@@ -372,14 +370,12 @@ public:
             Text(296,264,Power,76,Ivory,false,true);
             const float PW=Measure->Measure(Power,FontFor(76,false,true)).X;
             Text(305+PW,306,TEXT("W"),25,Muted,false,true);
-            Text(300,376,TEXT("当前照明功率  /  九个照明回路"),14,Muted);
+            Text(300,376,TEXT("照明功率"),14,Muted);
             Line({{300,412},{796,412}},FLinearColor(.3f,.32f,.33f,.6f));
             Text(300,437,FString::Printf(TEXT("%s · %s"),CourseworkRooms::Get(Room).Floor,CourseworkRooms::Get(Room).Name),19,Ivory);
             Text(300,479,FString::Printf(TEXT("%.1f W"),Owner->GetRoomWatts(Room)),35,Ivory,false,true);
-            Text(300,535,FString::Printf(TEXT("回路额定 %.0f W   ·   当前亮度 %d%%"),Owner->GetRoomRatedWatts(Room),FMath::RoundToInt((Owner->IsRoomLightOn(Room)?Owner->GetRoomBrightness(Room):0)*100)),13,Muted);
-            Rect(300,570,300,42,Hover==506?Gold:Muted);CenterText(FSlateRect(300,570,600,612),TEXT("调节该房间照明"),16,Ivory);
             Line({{842,142},{842,594}},FLinearColor(.3f,.32f,.33f,.45f));
-            Text(884,144,TEXT("同一时长 · 电量对比"),22,Ivory);
+            Text(884,144,TEXT("电量对比"),22,Ivory);
             Text(884,201,TEXT("持续时长"),14,Muted);
             const float Hours[]={1,4,8};
             for(int32 I=0;I<3;++I){const float X=1130+92.f*I;const bool Selected=FMath::IsNearlyEqual(Owner->GetEnergyHours(),Hours[I]);Rect(X,195,82,38,Selected?Gold:Muted);if(Selected)Box(X+1,196,80,36,FLinearColor(.22f,.20f,.15f,.5f));CenterText(FSlateRect(X,195,X+82,233),FString::Printf(TEXT("%.0f h"),Hours[I]),14,Selected?Ivory:Muted);}
@@ -393,8 +389,7 @@ public:
             const TCHAR* Labels[]={TEXT("全开对比"),TEXT("节能对比"),TEXT("恢复原配置")};
             for(int32 I=0;I<3;++I){const float X=300+184.f*I;const bool Disabled=Owner->IsSafetyDrillRunning()||(I==2&&!Owner->IsEnergyComparisonActive());Rect(X,650,172,58,Disabled?FLinearColor(.23f,.25f,.26f):Hover==500+I?Gold:Muted);CenterText(FSlateRect(X,650,X+172,708),Labels[I],17,Disabled?Muted:Ivory);}
             Rect(1050,650,250,58,Owner->IsSafetyDrillRunning()?Muted:Hover==503?Gold:Muted);CenterText(FSlateRect(1050,650,1300,708),TEXT("查看用电流向"),17,Owner->IsSafetyDrillRunning()?Muted:Ivory);
-            Text(300,730,Owner->IsSafetyDrillRunning()?TEXT("疏散演练中 · 能源方案切换已暂停"):Owner->IsEnergyComparisonActive()?TEXT("正在对比 · 调整暂不保存，可恢复进入前的灯光配置"):TEXT("当前配置 · 通过 E 或灯光页调整，数据随场景同步"),14,Gold);
-            Text(300,768,TEXT("模拟估算 · 功率按亮度线性估算；电量按所选时长持续使用计算"),12,Muted);
+            Text(884,566,TEXT("照明电量估算"),13,Muted);
         }
         else if(Mode==7)
         {
@@ -402,8 +397,7 @@ public:
             const FLinearColor Alert(.93f,.39f,.22f),Safe(.52f,.72f,.61f),StatusColor=State==3?Safe:State>=2?Alert:Gold;
             Text(56,154,TEXT("演练场景"),17,Muted);Box(52,203,194,76,Ivory);
             Text(76,207,TEXT("烟感与疏散"),20,Ink);Text(76,246,TEXT("厨房 / 室外集合点"),12,Ink);
-            Text(300,160,TEXT("住宅安全  /  人员疏散"),14,Muted);Text(300,197,TEXT("平安有序"),34,Ivory,true);
-            Text(300,302,TEXT("当前状态"),15,Muted);
+            Text(300,197,TEXT("疏散演练"),34,Ivory,true);
             Box(300,352,4,42,StatusColor);Text(323,347,Owner->GetSafetyStatus(),22,StatusColor);
             const TCHAR* Steps[]={TEXT("01  烟感监测"),TEXT("02  报警"),TEXT("03  人员撤离"),TEXT("04  集合")};
             for(int32 I=0;I<4;++I)
@@ -413,79 +407,68 @@ public:
                 Text(X,459,Steps[I],14,Reached?Ivory:Muted);
             }
             Box(300,519,530,4,FLinearColor(.20f,.22f,.23f));Box(300,519,530*Owner->GetSafetyProgress(),4,StatusColor);
-            const FString Reading=FString::Printf(TEXT("模拟烟雾指数 %.0f / 100 · 报警阈值 30 · 已集合 %d / 2"),Owner->GetSmokeReading(),int32(Owner->HasPlayerGathered())+int32(Owner->HasResidentGathered()));
-            Text(300,541,Reading,14,Muted);
-            const TCHAR* Actions[]={TEXT("启动演练"),TEXT("结束演练"),TEXT("中止复位")};
-            const bool Enabled[]={!Running&&Owner->IsSafetyReady(),State==3,Running};
-            for(int32 I=0;I<3;++I)
-            {
-                const float X=300+180.f*I;const FLinearColor C=Enabled[I]?(I==0?Gold:Ivory):Muted;
-                if(Enabled[I]&&Hover==400+I)Box(X,585,170,56,FLinearColor(1,1,1,.075f));
-                Rect(X,585,170,56,Enabled[I]?C:FLinearColor(.22f,.24f,.24f));
-                CenterText(FSlateRect(X,585,X+170,641),Actions[I],18,C);
-            }
-            if(Hover==403)Box(300,695,260,56,FLinearColor(1,1,1,.06f));
-            Text(300,711,TEXT("查看集合点与路线  →"),18,Ivory);
-            Text(300,773,Running?TEXT("演练期间请步行前往集合点，住户会自行撤离"):Owner->GetLastEvacuationResult(),13,Muted);
+            const int32 Action=!Running?400:State==3?401:402;
+            const FString ActionText=!Running?TEXT("启动演练"):State==3?TEXT("结束演练"):TEXT("中止演练");
+            Rect(300,585,260,56,Hover==Action?Gold:Muted);CenterText(FSlateRect(300,585,560,641),ActionText,18,Ivory);
+            if(Running)Text(300,711,TEXT("查看疏散路线  →"),18,Hover==403?Gold:Ivory);
+            if(!Running&&!Owner->GetLastEvacuationResult().IsEmpty())Text(300,710,Owner->GetLastEvacuationResult(),15,Muted);
+            if(Running){
             Box(1000,260,508,460,FLinearColor(.012f,.016f,.020f,.94f));
             Text(1032,291,TEXT("人员清点"),25,Ivory,true);
             Text(1032,365,TEXT("你的状态"),14,Muted);
-            Text(1032,398,Owner->HasPlayerGathered()?TEXT("已到室外集合点"):TEXT("尚未到达 · 请沿地图路线撤离"),17,Owner->HasPlayerGathered()?Safe:Ivory);
+            Text(1032,398,Owner->HasPlayerGathered()?TEXT("已到室外集合点"):TEXT("尚未集合"),17,Owner->HasPlayerGathered()?Safe:Ivory);
             Text(1032,449,TEXT("住户状态"),14,Muted);
             Text(1032,482,Owner->GetResidentEvacuationStatus(),17,Owner->HasResidentGathered()?Safe:Ivory);
             Text(1032,545,FString::Printf(TEXT("报警后用时    %.1f 秒"),Owner->GetAlarmElapsed()),17,Gold);
-            Text(1032,593,TEXT("集合点：入户门外绿色圆环"),16,Muted);
-            Text(1032,637,TEXT("人员集合不代表厨房火警解除"),15,Gold);
-            Text(1032,680,TEXT("教学模拟 · 无真实传感器接入"),13,Muted);
+            }
             if(!Owner->IsSafetyReady())Text(300,773,TEXT("演练资源不完整，请查看运行日志"),14,Alert);
         }
         else if(Mode==9&&Owner->GetComfortPage()==1)
         {
             Text(56,154,TEXT("舒适"),17,Muted);
-            Text(56,205,TEXT("日照采光"),21,Hover==640?Ivory:Muted);
+            Text(56,205,TEXT("昼夜时间"),21,Hover==640?Ivory:Muted);
             Text(56,257,TEXT("自然通风"),21,Ivory);Box(48,253,3,29,Gold);
             for(int32 I=0;I<CourseworkRooms::Count;++I){const int32 ID=CourseworkRooms::DisplayOrder[I];const float Y=320+49.f*I;const bool Selected=Room==ID;if(Selected)Box(52,Y,194,47,Ivory);else if(Hover==110+ID)Box(52,Y,194,47,FLinearColor(1,1,1,.045f));const auto& R=CourseworkRooms::Get(ID);Text(68,Y+3,R.Name,16,Selected?Ink:Muted);Text(68,Y+27,R.Floor,11,Selected?Ink:Muted);}
             const auto& R=CourseworkRooms::Get(Room);const int32 Count=Owner->GetRoomWindowCount(Room),Opened=Owner->GetRoomOpenWindowCount(Room);const bool Locked=Owner->IsSafetyDrillRunning(),Cross=Owner->HasRoomCrossFlow(Room);const float Strength=Owner->GetRoomVentilation(Room);
-            Text(300,160,FString::Printf(TEXT("%s  /  %s"),R.Floor,R.Name),14,Muted);Text(300,197,TEXT("让空气流动"),34,Ivory,true);
-            Text(300,296,TEXT("自然换气状态"),18,Muted);
+            Text(300,197,R.Name,34,Ivory,true);
             Text(300,338,Locked?TEXT("演练优先"):Cross?TEXT("对流通风"):Opened?TEXT("局部换气"):Strength>.03f?TEXT("间接换气"):TEXT("尚未开窗"),34,Ivory,true);
             Box(300,424,540,4,FLinearColor(.2f,.22f,.23f));Box(300,424,540*Strength,4,Gold);
             Text(300,446,TEXT("弱"),13,Muted);Text(550,446,TEXT("一般"),13,Muted);Text(812,446,TEXT("较好"),13,Muted);
             Text(300,498,Count?FString::Printf(TEXT("本房已开  %d / %d 扇窗"),Opened,Count):TEXT("本房没有直接外窗"),20,Count?Ivory:Muted);
             const FLinearColor ActionColor=Count&&!Locked?Ivory:Muted;
-            Rect(300,552,250,56,Hover==650?Gold:Muted);CenterText(FSlateRect(300,552,550,608),TEXT("打开本房窗户"),18,ActionColor);
-            Rect(566,552,250,56,Hover==651?Gold:Muted);CenterText(FSlateRect(566,552,816,608),TEXT("关闭本房窗户"),18,ActionColor);
-            Rect(300,686,250,56,Hover==654?Gold:Muted);CenterText(FSlateRect(300,686,550,742),TEXT("前往窗边观察"),18,ActionColor);
-            Rect(566,686,250,56,Hover==653?Gold:Muted);CenterText(FSlateRect(566,686,816,742),TEXT("关闭全部窗户"),18,Locked?Muted:Ivory);
-            Box(1016,282,428,340,FLinearColor(.015f,.022f,.028f,.86f));
-            Text(1050,315,TEXT("空气从哪里来"),22,Ivory);Text(1050,370,TEXT("室外风向：东向西"),17,Muted);Text(1050,412,TEXT("门窗共同决定进、出风口"),17,Muted);Text(1050,454,TEXT("气流沿连通空间由高压向低压"),17,Muted);
-            Text(1050,536,Locked?TEXT("演练期间暂停展示"):Cross?TEXT("对向开口 · 通路已连通"):Opened?TEXT("局部换气 · 窗边为主"):Count?TEXT("打开窗户开始观察"):TEXT("通过相邻房间换气"),16,Gold);
-            Rect(1050,686,330,56,Hover==652?Gold:Muted);CenterText(FSlateRect(1050,686,1380,742),Owner->IsAirflowDisplayed()?TEXT("隐藏气流"):TEXT("显示气流"),18,Locked?Muted:Ivory);
-            Text(300,773,TEXT("自然通风示意 · 固定室外风向 · 非真实流体计算"),13,Muted);
+            Rect(300,552,250,56,Hover==650?Gold:Muted);CenterText(FSlateRect(300,552,550,608),Opened?TEXT("关闭窗户"):TEXT("打开窗户"),18,ActionColor);
+            Text(1050,310,TEXT("室外风向"),18,Muted);Text(1050,360,TEXT("东  →  西"),30,Ivory);
+            Rect(1050,552,330,56,Hover==652?Gold:Muted);CenterText(FSlateRect(1050,552,1380,608),Owner->IsAirflowDisplayed()?TEXT("隐藏气流"):TEXT("显示气流"),18,Locked?Muted:Ivory);
+
         }
         else if(Mode==9)
         {
-            const bool Active=Owner->IsDaylightActive(),Locked=Owner->IsSafetyDrillRunning();
-            const FLinearColor ButtonColor=Locked?Muted:Ivory;
-            const float Hour=Owner->GetDaylightHour();const int32 Minutes=FMath::FloorToInt(Hour*60+.0001f)%1440;
-            Text(56,154,TEXT("舒适"),17,Muted);Text(56,205,TEXT("日照采光"),21,Ivory);Box(48,201,3,29,Gold);Text(56,257,TEXT("自然通风"),21,Hover==641?Ivory:Muted);
-            Text(300,160,TEXT("客厅  /  同一位置对比"),14,Muted);Text(300,197,TEXT("光影之间"),34,Ivory,true);
-            Text(300,296,FString::Printf(TEXT("第 %lld 天   %s"),Owner->GetTimeDay(),*Owner->GetTimeStatus()),18,Muted);
-            Text(300,329,Active?FString::Printf(TEXT("%02d:%02d"),Minutes/60,Minutes%60):FString(TEXT("--:--")),68,Ivory,false,true);
-            const float T=Hour/24.f;Box(300,468,540,4,FLinearColor(.2f,.22f,.23f));Box(300,468,540*T,4,Gold);Box(294+540*T,461,12,18,Ivory);
-            Text(300,493,TEXT("00:00"),13,Muted,false,true);Text(550,493,TEXT("12:00"),13,Muted,false,true);Text(797,493,TEXT("23:59"),13,Muted,false,true);
-            const TCHAR* Labels[]={TEXT("上午"),TEXT("正午"),TEXT("傍晚"),TEXT("夜间")};const float Hours[]={8,12,17,21};
-            for(int32 I=0;I<4;++I){const float X=300+136.f*I;const bool Selected=Active&&FMath::IsNearlyEqual(Hour,Hours[I],.01f);if(Selected||Hover==610+I)Box(X,552,128,56,FLinearColor(Gold.R,Gold.G,Gold.B,.12f));Rect(X,552,128,56,Selected?Gold:Muted);CenterText(FSlateRect(X,552,X+128,608),Labels[I],18,Selected?Gold:ButtonColor);}
-            Rect(300,686,260,56,Hover==620&&!Locked?Gold:Muted);CenterText(FSlateRect(300,686,560,742),TEXT("回到正午"),18,ButtonColor);
-            Rect(300,622,260,48,Owner->IsTimeFlowing()?Gold:Muted);CenterText(FSlateRect(300,622,560,670),TEXT("时间流动"),18,Locked?Muted:Owner->IsTimeFlowing()?Gold:Ivory);
-            Rect(580,622,260,48,!Owner->IsTimeFlowing()?Gold:Muted);CenterText(FSlateRect(580,622,840,670),TEXT("固定当前时间"),18,Locked?Muted:!Owner->IsTimeFlowing()?Gold:Ivory);
-            Box(1016,282,428,340,FLinearColor(.015f,.022f,.028f,.86f));
-            Text(1050,315,TEXT("昼夜流速"),22,Ivory);Text(1050,370,TEXT("现实多少分钟经过一天"),18,Muted);Text(1050,412,TEXT("固定时间只暂停昼夜变化"),17,Muted);Text(1050,454,TEXT("人物与房间交互照常运行"),17,Muted);
-            const float Rates[]={6,24,60};
-            for(int32 I=0;I<3;++I){const float X=1050+112.f*I;const bool Chosen=FMath::IsNearlyEqual(Owner->GetTimeDayMinutes(),Rates[I]);Rect(X,520,104,48,Chosen?Gold:Muted);CenterText(FSlateRect(X,520,X+104,568),FString::Printf(TEXT("%d 分钟"),int32(Rates[I])),16,Locked?Muted:Chosen?Gold:Ivory);}
-            Text(1050,590,FString::Printf(TEXT("太阳高度角  %.1f°"),Owner->GetDaylightElevation()),16,Muted);
-            Rect(1050,686,330,56,Hover==621?Gold:Muted);CenterText(FSlateRect(1050,686,1380,742),TEXT("前往客厅观察点"),18,ButtonColor);
-            Text(300,773,Locked?TEXT("演练期间暂缓时间流动，结束后恢复原模式"):TEXT("全天日照示意；方向键微调时间，关闭此页后按所选模式运行"),13,Locked?Gold:Muted);
+            SyncTimeDraft();const bool Locked=Owner->IsSafetyDrillRunning();
+            Text(56,154,TEXT("舒适"),17,Muted);Text(56,205,TEXT("昼夜时间"),21,Ivory);Box(48,201,3,29,Gold);Text(56,257,TEXT("自然通风"),21,Hover==641?Ivory:Muted);
+            Text(300,197,TEXT("昼夜"),34,Ivory,true);
+            const int32 Current=FMath::FloorToInt(Owner->GetDaylightHour()*60+.0001f)%1440;
+            Text(300,300,FString::Printf(TEXT("当前 %02d:%02d"),Current/60,Current%60),19,Muted);
+            const FVector2D C(930,440);const float Radius=220;
+            auto FacePoint=[&](float Hour,float R){const float A=Hour*2*PI/24+PI/2;return C+FVector2D(FMath::Cos(A),FMath::Sin(A))*R;};
+            auto CircleLine=[&](FVector2D Center,float R,FLinearColor Color,float Thickness){TArray<FVector2D> P;for(int32 I=0;I<=128;++I){const float A=I*2*PI/128;P.Add(Center+FVector2D(FMath::Cos(A),FMath::Sin(A))*R);}Line(P,Color,Thickness);};
+            CircleLine(C,Radius+12,FLinearColor(.55f,.53f,.46f,.32f),1);
+            CircleLine(C,Radius-28,FLinearColor(.55f,.53f,.46f,.22f),1);
+            for(int32 I=0;I<96;++I){const float H=I/4.f;const bool Major=I%4==0;const bool Day=H>=6&&H<=18;Line({FacePoint(H,Radius-(Major?13:5)),FacePoint(H,Radius)},Day?FLinearColor(.82f,.73f,.53f,.8f):FLinearColor(.49f,.58f,.69f,.65f),Major?1.5f:1.f);}
+            for(int32 H=0;H<24;H+=3){const FVector2D P=FacePoint(float(H),Radius+39);CenterText(FSlateRect(P.X-24,P.Y-15,P.X+24,P.Y+15),FString::Printf(TEXT("%02d"),H),16,Muted);}
+            const FVector2D Tip=FacePoint(DraftHour,Radius-4);
+            Line({FacePoint(DraftHour,100),FacePoint(DraftHour,Radius-23)},Locked?Muted:Gold,2);
+            CircleLine(Tip,9,Locked?Muted:Gold,2);
+            // The face centre remains open around the digital readout.
+            const int32 M=FMath::RoundToInt(DraftHour*60)%1440;
+            const FString Time=FString::Printf(TEXT("%02d:%02d"),M/60,M%60);
+            const float TW=Measure->Measure(Time,FontFor(54,false,true)).X;Text(C.X-TW/2,384,Time,54,Ivory,false,true);
+            const TCHAR* Phase=DraftHour<5?TEXT("深夜"):DraftHour<8?TEXT("清晨"):DraftHour<11?TEXT("上午"):DraftHour<14?TEXT("正午"):DraftHour<17?TEXT("午后"):DraftHour<19?TEXT("傍晚"):TEXT("夜间");
+            CenterText(FSlateRect(835,465,1025,496),Phase,17,Muted);
+            Rect(785,738,22,22,Locked?Muted:Gold);if(DraftFixed)Line({{789,748},{796,755},{805,742}},Gold,2);
+            Text(824,734,TEXT("固定时间"),19,Locked?Muted:Ivory);
+            const bool Changed=FMath::Abs(DraftHour-Owner->GetDaylightHour())>.001f||DraftFixed==Owner->IsTimeFlowing();
+            Rect(1250,725,210,52,Locked||!Changed?Muted:Gold);CenterText(FSlateRect(1250,725,1460,777),TEXT("应用"),19,Locked||!Changed?Muted:Ivory);
+            if(Locked)Text(300,360,TEXT("演练中"),17,Gold);
         }
         else if(Mode==1)
         {
@@ -501,10 +484,9 @@ public:
             Text(300,160,TEXT("鼠标  /  移动"),14,Muted);Text(300,197,TEXT("操作设置"),34,Ivory,true);
             Text(300,295,TEXT("鼠标灵敏度"),19,Ivory);Text(601,295,FString::Printf(TEXT("%.2f ×"),Owner->GetSensitivity()),18,Gold,false,true);Slider(353,(Owner->GetSensitivity()-.25f)/1.75f,true);Text(300,379,TEXT("0.25 ×"),13,Muted,false,true);Text(653,379,TEXT("2 ×"),13,Muted,false,true);
             Text(300,466,TEXT("移动速度"),19,Ivory);Text(601,466,FString::Printf(TEXT("%.2f ×"),Owner->GetSpeedScale()),18,Gold,false,true);Slider(524,(Owner->GetSpeedScale()-.5f)/1.5f,true);Text(300,550,TEXT("0.5 ×"),13,Muted,false,true);Text(653,550,TEXT("2 ×"),13,Muted,false,true);
-            Text(300,713,TEXT("仅作用于本次运行，重新启动后恢复默认"),13,Muted);
+
         }
         Box(0,824,1600,76,FLinearColor(0,0,0,.26f));Line({{0,824},{1600,824}},FLinearColor(.5f,.5f,.48f,.25f));
-        KeyHint(56,TEXT("Tab"),TEXT("关闭"));
         const float RightWidth=54+16+Measure->Measure(TEXT("返回"),FontFor(17)).X;
         KeyHint(1544-RightWidth,TEXT("Esc"),TEXT("返回"));
         return Layer+4;
@@ -512,6 +494,9 @@ public:
 private:
     TWeakObjectPtr<ACourseworkHUD> Owner;
     int32 Hover=INDEX_NONE,Drag=INDEX_NONE;
+    mutable int32 DraftRevision=INDEX_NONE;
+    mutable float DraftHour=12;
+    mutable bool DraftFixed=false;
     int32 Typography=4;
     bool bDetail=false;
     bool bBodyDetail=false;

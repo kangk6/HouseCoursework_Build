@@ -63,7 +63,9 @@ public:
 
 
     int32 GetComfortPage()const{return ComfortPage;}
-    void SelectComfortPage(int32 Page){ComfortPage=FMath::Clamp(Page,0,1);}
+    void SelectComfortPage(int32 Page){if(ComfortPage!=FMath::Clamp(Page,0,1)){ComfortPage=FMath::Clamp(Page,0,1);++TimeEditorRevision;}}
+    int32 GetTimeEditorRevision()const{return TimeEditorRevision;}
+    bool IsStartupCovered()const{return bStartupCover;}
     int32 GetRoomWindowCount(int32 Room)const;
     int32 GetRoomOpenWindowCount(int32 Room)const;
     void SetRoomWindows(int32 Room,bool Open);
@@ -146,7 +148,12 @@ private:
     void TickDaylightSweep();
     void TickTimeOfDay(float DeltaSeconds);
     void TickClockAcceptance();
+    void TickDialAcceptance();
+    void TickStartupAcceptance();
     FCourseworkClock Clock;
+    int32 TimeEditorRevision=0;
+    bool bStartupCover=false;
+    double StartupRevealAt=0;
     UPROPERTY() TObjectPtr<class ACourseworkDaylight> Daylight;
     UPROPERTY() TObjectPtr<class ACourseworkVentilation> Ventilation;
     int32 ComfortPage=0,TargetWindow=INDEX_NONE;

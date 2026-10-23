@@ -85,7 +85,7 @@ void ACourseworkHUD::TickVentilationAcceptance()
  switch(R.Step++)
  {
  case 0:Record(TEXT("all_window_closed_poses_exact"),Ventilation->CheckClosedPoses());Record(TEXT("comfort_header_pointer"),Click(690,43)&&PanelMode==9);Record(TEXT("ventilation_subpage_pointer"),Click(150,270)&&GetComfortPage()==1);Overlay->ShowLightingRoom(0);Shot(TEXT("Ventilation_panel_closed.png"));break;
- case 1:Record(TEXT("room_open_pointer"),Click(425,580)&&GetRoomOpenWindowCount(0)==4);Record(TEXT("show_airflow_pointer"),Click(1200,710)&&IsAirflowDisplayed());LivingSide(false);break;
+ case 1:Record(TEXT("room_open_pointer"),Click(425,580)&&GetRoomOpenWindowCount(0)==4);Record(TEXT("show_airflow_pointer"),Click(1200,580)&&IsAirflowDisplayed());LivingSide(false);break;
  case 2:Record(TEXT("single_side_exchange_without_false_crossflow"),GetRoomVentilation(0)>.15f&&!HasRoomCrossFlow(0));Record(TEXT("single_side_paths_respect_solids"),Ventilation->GetPathCount()>0&&Ventilation->CheckPathsClear());Shot(TEXT("Ventilation_panel_local.png"));break;
  case 3:SetRoomWindows(0,true);SetRoomWindows(2,true);break;
  case 4:Record(TEXT("opposed_windows_form_crossflow"),HasRoomCrossFlow(0)&&HasRoomCrossFlow(2)&&Ventilation->GetCrossPathCount()>0);Record(TEXT("pressure_balanced_and_high_to_low"),Ventilation->CheckFlowDirections());Record(TEXT("crossflow_stronger_than_local_exchange"),GetRoomVentilation(0)>.6f);Record(TEXT("crossflow_routes_do_not_cross_solids"),Ventilation->CheckPathsClear());Record(TEXT("open_windows_move_nearby_leaves"),Ventilation->GetMaxLeafMotion()>.01f);Record(TEXT("plant_pots_and_stems_do_not_translate"),Ventilation->CheckPlantTransforms());Shot(TEXT("Ventilation_panel_cross.png"));break;

@@ -58,10 +58,10 @@ void ACourseworkHUD::TickClockAcceptance()
         Shot(TEXT("Clock_startup_noon.png"));SetPanel(9);SelectComfortPage(0);R.Hour=Clock.Hour;R.Elapsed=Clock.ElapsedSimulationSeconds;break;
     case 1:
         Check(TEXT("time_page_suspends_without_changing_mode"),Clock.Hour==R.Hour&&Clock.bRunning&&Clock.ElapsedSimulationSeconds==R.Elapsed);
-        Check(TEXT("fixed_pointer"),Click(710,646)&&!Clock.bRunning);R.World=GetWorld()->GetTimeSeconds();SetPanel(0);break;
+        Check(TEXT("fixed_mode_api"),SetTimeFlowing(false)&&!Clock.bRunning);R.World=GetWorld()->GetTimeSeconds();SetPanel(0);break;
     case 2:
         Check(TEXT("fixed_keeps_time_but_world_runs"),Clock.Hour==R.Hour&&GetWorld()->GetTimeSeconds()>R.World+1);
-        SetPanel(9);Check(TEXT("flow_pointer"),Click(420,646)&&Clock.bRunning);Check(TEXT("speed_6_pointer"),Click(1100,544)&&Clock.DayMinutes==6);
+        SetPanel(9);Check(TEXT("flow_mode_api"),SetTimeFlowing(true)&&Clock.bRunning);Check(TEXT("speed_6_api"),SetTimeDayMinutes(6)&&Clock.DayMinutes==6);
         SetDaylightHour(23.99f);R.Day=Clock.Day;SetPanel(0);break;
     case 3:
         Check(TEXT("natural_midnight_crosses_day"),Clock.Day==R.Day+1&&Clock.Hour<.5);
@@ -93,9 +93,9 @@ void ACourseworkHUD::TickClockAcceptance()
         Check(TEXT("flow_resumes_after_fire"),Clock.bRunning&&Clock.Hour>R.Hour);SetTimeFlowing(false);TriggerKitchenAlarm();R.Hour=Clock.Hour;break;
     case 10:
         Check(TEXT("fixed_mode_survives_fire"),!Clock.bRunning&&Clock.Hour==R.Hour&&SmokeReading>10);ResetKitchenAlarm();
-        SetPanel(9);Check(TEXT("speed_24_pointer"),Click(1220,544)&&Clock.DayMinutes==24);Check(TEXT("speed_60_pointer"),Click(1330,544)&&Clock.DayMinutes==60);
-        Check(TEXT("slider_zero"),Click(300,470)&&Clock.Hour==0);Check(TEXT("slider_last_minute"),Click(840,470)&&FMath::IsNearlyEqual(float(Clock.Hour),1439.f/60,.001f));
-        Check(TEXT("return_to_noon_pointer"),Click(420,710)&&Clock.Hour==12&&!Clock.bRunning);Shot(TEXT("Clock_panel_fixed.png"));break;
+        SetPanel(9);Check(TEXT("speed_24_api"),SetTimeDayMinutes(24)&&Clock.DayMinutes==24);Check(TEXT("speed_60_api"),SetTimeDayMinutes(60)&&Clock.DayMinutes==60);
+        Check(TEXT("manual_zero"),SetDaylightHour(0)&&Clock.Hour==0);Check(TEXT("manual_last_minute"),SetDaylightHour(1439.f/60)&&FMath::IsNearlyEqual(float(Clock.Hour),1439.f/60,.001f));
+        Check(TEXT("manual_noon"),SetDaylightHour(12)&&Clock.Hour==12&&!Clock.bRunning);Shot(TEXT("Clock_panel_fixed.png"));break;
     case 11:
         Check(TEXT("fixed_mode_survives_page_changes"),!Clock.bRunning);SelectComfortPage(1);SetTimeFlowing(true);R.Hour=Clock.Hour;break;
     case 12:

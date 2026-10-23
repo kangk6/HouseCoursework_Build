@@ -25,6 +25,7 @@ public:
     void SetToast(const FString& Text);
     void ShowLightingRoom(int32 Room);
     bool ExerciseControlPointer(FVector2D Position);
+    bool ExerciseTimeSelection(float Hour);
     bool ExerciseControlDrag(FVector2D Position,int32 Phase);
     bool ExerciseEnergyMapButton();
     bool ExerciseMapDestination(int32 Destination);
@@ -60,6 +61,7 @@ private:
     UPROPERTY() TObjectPtr<UTextBlock> LightValue;
     UPROPERTY() TObjectPtr<USlider> LightSlider;
     UPROPERTY() TObjectPtr<UCourseworkControlWidget> ControlMenu;
+    UPROPERTY() TObjectPtr<UBorder> StartupCover;
     int32 LightingRoom=0;
     UButton* MakePanelButton(const FString& Label,FName Handler,bool Accent=false);
     void RefreshLightReadout();

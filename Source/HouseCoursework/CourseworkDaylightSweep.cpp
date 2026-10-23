@@ -21,7 +21,7 @@ void ACourseworkHUD::TickDaylightSweep()
     struct FRun{int32 Stage=0,Scenario=0;double At=0,LastFrame=0;double LastShot=-1;int32 ShotCount=0;TArray<FString> Frames;};
     static FRun R;const double Now=GetWorld()->GetRealTimeSeconds();
     auto* PC=GetOwningPlayerController();auto* C=Cast<ACharacter>(PC->GetPawn());
-    auto Click=[&](float H,int32 Phase){return Overlay->ExerciseControlDrag(FVector2D(300+540*H/24.f,470),Phase);};
+    auto Click=[&](float H,int32 Phase){const float A=H*2*PI/24+PI/2;return Overlay->ExerciseControlDrag(FVector2D(930+220*FMath::Cos(A),440+220*FMath::Sin(A)),Phase);};
     const float From[]={12,17.4f,21},To[]={16,18.6f,14};
     if(TestCase<0)
     {
@@ -33,7 +33,7 @@ void ACourseworkHUD::TickDaylightSweep()
     else if(R.Stage==1)
     {
         const float T=FMath::Clamp(float(Elapsed/1.5),0.f,1.f);Click(FMath::Lerp(From[R.Scenario],To[R.Scenario],T),1);
-        if(T>=1){Click(To[R.Scenario],2);R.Stage=2;R.At=Now;}
+        if(T>=1){Click(To[R.Scenario],2);Overlay->ExerciseControlPointer({1350,750});R.Stage=2;R.At=Now;}
     }
     else if(R.Stage==2&&Elapsed>1.8)
     {

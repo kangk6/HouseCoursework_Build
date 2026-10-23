@@ -43,13 +43,13 @@ void ACourseworkHUD::TickControlAcceptance()
     case 6:Name=TEXT("brightness_maximum");Passed=Click(682,477)&&FMath::IsNearlyEqual(GetRoomBrightness(0),1.f);Shot(TEXT("Tab_living_100.png"));break;
     case 7:{Name=TEXT("room_selection_does_not_teleport");const FVector Before=Character->GetActorLocation();Passed=Click(160,499)&&FVector::Dist(Before,Character->GetActorLocation())<1;break;}
     case 8:Name=TEXT("room_independent_value");Passed=Click(433.7f,477)&&FMath::IsNearlyEqual(GetRoomBrightness(1),.35f,.002f)&&FMath::IsNearlyEqual(GetRoomBrightness(0),1.f);Shot(TEXT("Tab_master_35.png"));break;
-    case 9:Name=TEXT("room_reset");Passed=Click(410,735)&&IsRoomLightOn(1)&&FMath::IsNearlyEqual(GetRoomBrightness(1),1.f);break;
+    case 9:Name=TEXT("room_reset");ResetRoomLighting(1);Passed=IsRoomLightOn(1)&&FMath::IsNearlyEqual(GetRoomBrightness(1),1.f);break;
     case 10:Name=TEXT("settings_auxiliary_gear");Passed=Click(1512,45)&&PanelMode==4;break;
     case 11:Name=TEXT("sensitivity_slider");Passed=Click(491,353)&&FMath::IsNearlyEqual(GetSensitivity(),1.125f,.002f);break;
     case 12:Name=TEXT("speed_slider");Passed=Click(491,524)&&FMath::IsNearlyEqual(GetSpeedScale(),1.25f,.002f);Shot(TEXT("Tab_settings.png"));break;
     case 13:Name=TEXT("map_auxiliary_entry");Passed=Click(1340,45)&&PanelMode==5;Shot(TEXT("Tab_navigation.png"));break;
     case 14:Name=TEXT("navigation_living");Passed=Overlay->ExerciseMapDestination(1)&&PanelMode==0&&FVector::Dist(Character->GetActorLocation(),FVector(-1990,9800,160))<50;break;
-    case 15:Name=TEXT("menu_close_releases_input");SetPanel(6);Passed=Click(130,860)&&PanelMode==0&&!PC->IsMoveInputIgnored()&&!PC->IsLookInputIgnored()&&!PC->bShowMouseCursor;break;
+    case 15:Name=TEXT("menu_close_releases_input");SetPanel(6);Passed=Click(1480,860)&&PanelMode==0&&!PC->IsMoveInputIgnored()&&!PC->IsLookInputIgnored()&&!PC->bShowMouseCursor;break;
     case 25:
         Name=TEXT("whole_off_keeps_each_brightness");for(int32 I=0;I<CourseworkRooms::Count;++I)SetRoomLighting(I,true,.2f+.07f*I);
         Passed=Click(1270,144);for(int32 I=0;I<CourseworkRooms::Count;++I)Passed &=!IsRoomLightOn(I)&&FMath::IsNearlyEqual(GetRoomBrightness(I),.2f+.07f*I,.001f);Shot(TEXT("Tab_whole_off.png"));break;
@@ -58,9 +58,9 @@ void ACourseworkHUD::TickControlAcceptance()
     case 27:
         Name=TEXT("local_value_after_whole_control");Passed=Click(567.4f,477)&&FMath::IsNearlyEqual(GetRoomBrightness(8),.7f,.002f);for(int32 I=0;I<8;++I)Passed &=FMath::IsNearlyEqual(GetRoomBrightness(I),.2f+.07f*I,.001f);break;
     case 28:
-        Name=TEXT("local_reset_preserves_other_rooms");Passed=Click(410,735)&&FMath::IsNearlyEqual(GetRoomBrightness(8),1.f);for(int32 I=0;I<8;++I)Passed &=FMath::IsNearlyEqual(GetRoomBrightness(I),.2f+.07f*I,.001f);break;
+        Name=TEXT("local_reset_preserves_other_rooms");ResetRoomLighting(8);Passed=FMath::IsNearlyEqual(GetRoomBrightness(8),1.f);for(int32 I=0;I<8;++I)Passed &=FMath::IsNearlyEqual(GetRoomBrightness(I),.2f+.07f*I,.001f);break;
     case 29:
-        Name=TEXT("whole_reset_defaults");Passed=Click(1450,144);for(int32 I=0;I<CourseworkRooms::Count;++I)Passed &=IsRoomLightOn(I)&&FMath::IsNearlyEqual(GetRoomBrightness(I),1.f);Shot(TEXT("Tab_whole_reset.png"));break;
+        Name=TEXT("whole_reset_defaults");ResetAllRoomLighting();Passed=true;for(int32 I=0;I<CourseworkRooms::Count;++I)Passed &=IsRoomLightOn(I)&&FMath::IsNearlyEqual(GetRoomBrightness(I),1.f);Shot(TEXT("Tab_whole_reset.png"));break;
     default:
         if(TestCase<16+CourseworkRooms::Count)
         {

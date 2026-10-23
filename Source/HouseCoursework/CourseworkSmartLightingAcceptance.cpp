@@ -62,7 +62,7 @@ void ACourseworkHUD::TickSmartLightingAcceptance()
         Overlay->ExerciseControlPointer({620,600});
         Record(TEXT("night_tab_can_reopen_manual_room"),SmartManualRooms.Contains(1)&&GetSmartRoomLevel(1)>.99f);
         SetRoomLighting(1,R.On[1],R.Brightness[1]);
-        Record(TEXT("exit_scene_pointer"),Overlay->ExerciseControlPointer({1420,278})&&SmartLightingScene==0);Record(TEXT("exit_restores_colors_and_levels"),OriginalLights()&&Unchanged());Record(TEXT("reading_scene_pointer"),Overlay->ExerciseControlPointer({1350,380})&&SmartLightingScene==2);break;
+        Record(TEXT("exit_scene_pointer"),Overlay->ExerciseControlPointer({1040,380})&&SmartLightingScene==0);Record(TEXT("exit_restores_colors_and_levels"),OriginalLights()&&Unchanged());Record(TEXT("reading_scene_pointer"),Overlay->ExerciseControlPointer({1350,380})&&SmartLightingScene==2);break;
     case 8:Record(TEXT("reading_armed_without_remote_activity"),!bSmartReadingOccupied&&FMath::IsNearlyEqual(GetSmartRoomLevel(4),R.On[4]?R.Brightness[4]:0,.01f));Place(FVector(-1840,10530,413),FVector(-1734,10661,440));SetPanel(0);break;
     case 9:
         Record(TEXT("desk_proximity_starts_task_light"),bSmartReadingOccupied&&GetSmartFixtureLevel(TEXT("SM_TableLamp_A1_32"))>.8f);

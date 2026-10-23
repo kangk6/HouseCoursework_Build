@@ -77,10 +77,10 @@ FString ACourseworkHUD::GetSafetyStatus()const
 {
     switch(SafetyState)
     {
-    case 1:return TEXT("烟感监测 · 模拟烟雾正在增加");
-    case 2:return TEXT("正在疏散 · 请前往室外集合点");
-    case 3:return TEXT("两人已集合 · 厨房警报仍在持续");
-    default:return TEXT("日常状态 · 尚未启动演练");
+    case 1:return TEXT("烟雾正在增加");
+    case 2:return TEXT("正在疏散");
+    case 3:return TEXT("两人已集合");
+    default:return TEXT("尚未启动演练");
     }
 }
 void ACourseworkHUD::TriggerKitchenAlarm()

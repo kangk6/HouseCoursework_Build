@@ -11,8 +11,9 @@ void ACourseworkHUD::InitializeTimeOfDay()
     Clock=FCourseworkClock();
     if(!Daylight)Daylight=GetWorld()->SpawnActor<ACourseworkDaylight>();
     if(Daylight)Daylight->Snap(float(Clock.Hour));
-    if(TestMode.IsEmpty())if(auto* PC=GetOwningPlayerController())
-        PC->PlayerCameraManager->StartCameraFade(1,0,.7f,FLinearColor::Black,false,false);
+    // Keep a real opaque cover through atmosphere registration, sky capture and
+    // exposure warmup. A zero-duration StartCameraFade does not hold a fade.
+    if(bStartupCover)StartupRevealAt=GetWorld()->GetRealTimeSeconds()+.9;
     UE_LOG(LogTemp,Display,TEXT("CLOCK_READY hour=12 day=1 flowing=1 real_minutes_per_day=24"));
 }
 bool ACourseworkHUD::IsTimeSuspended()const
