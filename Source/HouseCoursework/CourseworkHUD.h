@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "CourseworkRooms.h"
 #include "CourseworkClock.h"
+#include "CourseworkSolarModel.h"
 #include "GameFramework/HUD.h"
 #include "CourseworkHUD.generated.h"
 class UCourseworkOverlay;
@@ -60,6 +61,12 @@ public:
     bool IsEnergyMapLayer()const{return bEnergyMapLayer&&!IsSafetyDrillRunning();}
     void ToggleEnergyMapLayer();
     void OpenEnergyMap();
+    const FCourseworkSolarFlow& GetSolarFlow()const{return SolarFlow;}
+    const FCourseworkSolarMeter& GetSolarMeter()const{return SolarMeter;}
+    double GetSolarRatedWatts()const{return SolarPanels.Num()*360.;}
+    int32 GetSolarPanelCount()const{return SolarPanels.Num();}
+    bool IsSolarReady()const{return SolarPanels.Num()==6;}
+    bool IsEnergySuspended()const;
 
 
     int32 GetComfortPage()const{return ComfortPage;}
@@ -143,6 +150,14 @@ private:
     void RefreshLightInteraction();
     void TickFixtureAcceptance();
     void TickEnergyAcceptance();
+    void TickSolarAcceptance();
+    void InitializeSolar();
+    void TickSolar(float DeltaSeconds);
+    FCourseworkSolarFlow SolarFlow;
+    FCourseworkSolarMeter SolarMeter;
+    struct FSolarPanel{FVector Center,Normal;FQuat Rotation;};
+    TArray<FSolarPanel> SolarPanels;
+    UPROPERTY() TObjectPtr<AActor> SolarInstallation;
     void TickDaylightAcceptance();
     void TickEnvironmentRegression();
     void TickDaylightSweep();

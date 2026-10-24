@@ -1,4 +1,4 @@
-#include "CourseworkHUD.h"
+﻿#include "CourseworkHUD.h"
 #include "CourseworkDaylight.h"
 #include "CourseworkVentilation.h"
 #include "CourseworkOverlay.h"
@@ -27,6 +27,7 @@ void ACourseworkHUD::TickDayCycleAcceptance()
         double At=0,LastSample=-1,LastShot=-30,LastHour=12,LastSim=0;
         int64 InitialDay=1;int32 Shot=0;bool Manual=false,Probe=false;float Start=12,Span=24;double InitialSim=0;
         bool Forward=true,RenderFinite=true,PhysicalLights=true,ManualHeld=true,RoomPrefs=true,DaySun=true,NightSun=true;
+        bool SolarBalance=true,SolarNight=true;double SolarPeak=0;
         float MaxLag=0,MinDesk=1,MaxDesk=0;
         TArray<bool> On;TArray<float> Brightness;TArray<FString> Samples;
         TSet<int32> Hours;
@@ -60,6 +61,9 @@ void ACourseworkHUD::TickDayCycleAcceptance()
         R.Forward&=Advance<.1&&Clock.ElapsedSimulationSeconds>R.LastSim;
         R.LastHour=Clock.Hour;R.LastSim=Clock.ElapsedSimulationSeconds;
         const float H=GetDaylightHour(),Rendered=Daylight->GetRenderedHour();
+        R.SolarBalance&=FMath::Abs(SolarFlow.Generation+SolarFlow.Import-SolarFlow.Load-SolarFlow.Export)<.00001;
+        R.SolarPeak=FMath::Max(R.SolarPeak,SolarFlow.Generation);
+        if(Rendered<5||Rendered>19)R.SolarNight&=SolarFlow.Generation==0;
         R.MaxLag=FMath::Max(R.MaxLag,FMath::Abs(float(FCourseworkClock::Wrap(H-Rendered+12)-12)));
         R.RenderFinite&=FMath::IsFinite(Rendered)&&FMath::IsFinite(Daylight->GetSunIntensity())&&FMath::IsFinite(Daylight->GetSkyIntensity());
         R.Hours.Add(FMath::FloorToInt(H));
@@ -92,7 +96,7 @@ void ACourseworkHUD::TickDayCycleAcceptance()
                     FFileHelper::SaveArrayToFile(PNG,*(FPaths::ProjectSavedDir()/FString::Printf(TEXT("Screenshots/DayCycle/Frame_%03d_%02d%02d.png"),R.Shot++,int32(H),int32(H*60)%60)));
                 }
             }
-            R.Samples.Add(FString::Printf(TEXT("{\"elapsed\":%.5f,\"hour\":%.6f,\"day\":%lld,\"rendered\":%.6f,\"sun\":%.5f,\"sky\":%.5f,\"desk\":%.5f,\"ambient\":%.5f,\"luma\":%.5f,\"window_luma\":%.5f}"),Elapsed,Clock.Hour,Clock.Day,Rendered,Daylight->GetSunIntensity(),Daylight->GetSkyIntensity(),DeskLevel,GetSmartFixtureLevel(Ambient),Luma,WindowLuma));
+            R.Samples.Add(FString::Printf(TEXT("{\"elapsed\":%.5f,\"hour\":%.6f,\"day\":%lld,\"rendered\":%.6f,\"sun\":%.5f,\"sky\":%.5f,\"desk\":%.5f,\"ambient\":%.5f,\"luma\":%.5f,\"window_luma\":%.5f,\"pv_w\":%.5f,\"load_w\":%.5f,\"import_w\":%.5f,\"export_w\":%.5f}"),Elapsed,Clock.Hour,Clock.Day,Rendered,Daylight->GetSunIntensity(),Daylight->GetSkyIntensity(),DeskLevel,GetSmartFixtureLevel(Ambient),Luma,WindowLuma,SolarFlow.Generation,SolarFlow.Load,SolarFlow.Import,SolarFlow.Export));
         }
     }
     if(R.Probe?(Clock.ElapsedSimulationSeconds-R.InitialSim>=R.Span*3600):(Clock.Day==R.InitialDay+1&&Clock.Hour>=12.02))
@@ -107,6 +111,9 @@ void ACourseworkHUD::TickDayCycleAcceptance()
         Check(TEXT("daily_room_preferences_unchanged"),R.RoomPrefs);
         Check(TEXT("no_unbuilt_lighting_after_full_cycle"),GetWorld()->NumLightingUnbuiltObjects==0);
         Check(TEXT("pixel_samples_available"),R.Samples.Num()>(R.Probe?100:1000));
+        Check(TEXT("solar_supply_demand_balanced_throughout_cycle"),R.SolarBalance&&IsSolarReady());
+        Check(TEXT("solar_night_zero_and_day_generates"),R.SolarNight&&(R.Probe||R.SolarPeak>1000));
+        Check(TEXT("solar_cumulative_energy_conserved"),FMath::Abs(SolarMeter.Generation+SolarMeter.Import-SolarMeter.Load-SolarMeter.Export)<.000001&&(R.Probe||SolarMeter.Generation>1));
         FFileHelper::SaveStringToFile(FString::Printf(TEXT("{\"probe_only\":%s,\"test_minutes_per_day\":6,\"default_minutes_per_day\":24,\"checks\":["),R.Probe?TEXT("true"):TEXT("false"))+FString::Join(TestResults,TEXT(","))+TEXT("],\"samples\":[")+FString::Join(R.Samples,TEXT(","))+TEXT("]}"),*(FPaths::ProjectSavedDir()/TEXT("DayCycleAcceptance.json")));
         SetSmartLightingScene(0);SetTimeDayMinutes(24);TestMode.Empty();QuitApplication();
     }
