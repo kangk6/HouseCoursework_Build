@@ -165,7 +165,7 @@ public:
             const bool Powered=Owner->GetTotalWatts()>.001f;const FLinearColor Main=Powered?Flow:Idle;
             Line({Supply,Hub},Main,2,Layer+6);Box(Supply-FVector2D(4),{8,8},Main,Layer+7);
             if(Powered){const FVector2D D=Hub-Supply,Dir=D.GetSafeNormal(),Side(-Dir.Y,Dir.X);const float Phase=FMath::Fmod(Owner->GetWorld()->GetTimeSeconds()*25.f,32.f);for(float T=Phase;T<D.Size();T+=32){const FVector2D P=Supply+Dir*T;Line({P-Dir*3-Side*2,P,P-Dir*3+Side*2},Main,1.2f,Layer+7);}}
-            EnergyText(Supply+FVector2D(-5,-20),TEXT("电网"),Paper);
+            EnergyText(Supply+FVector2D(-5,-20),TEXT("住宅电源"),Paper);
             EnergyText(Hub+FVector2D(5,-20),TEXT("照明配电"),Paper);
             Box(Hub-FVector2D(3),{6,6},Main,Layer+7);
             for(int32 I=0;I<CourseworkRooms::Count;++I)

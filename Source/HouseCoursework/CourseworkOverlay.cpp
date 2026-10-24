@@ -1,4 +1,4 @@
-#include "CourseworkOverlay.h"
+﻿#include "CourseworkOverlay.h"
 #include "CourseworkHUD.h"
 #include "CourseworkMapWidget.h"
 #include "CourseworkControlWidget.h"
@@ -289,7 +289,7 @@ void UCourseworkOverlay::RefreshPanel()
     {
         PanelTitle->SetText(FText::FromString(OwnerHUD->IsEnergyMapLayer()?TEXT("照明用电流向"):TEXT("楼层地图")));
         PanelBody->SetText(FText::FromString(OwnerHUD->IsSafetyDrillRunning()?TEXT("烟感与疏散演练 · 报警后显示厨房位置和集合路线。住户会自行撤离，请步行前往室外绿色集合点。"):(OwnerHUD->GetPlayerFloor()==0?TEXT("当前位于一楼  ·  选择楼层查看布局，点击地点名称前往。 "):TEXT("当前位于二楼  ·  选择楼层查看布局，点击地点名称前往。 "))));
-        if(OwnerHUD->IsEnergyMapLayer())PanelBody->SetText(FText::FromString(TEXT("照明回路的用电流向示意 · 发光箭头随功率变化，关闭房间照明后停止。G 返回导航图。")));
+        if(OwnerHUD->IsEnergyMapLayer())PanelBody->SetText(FText::FromString(TEXT("照明回路分配示意，箭头随实际功率变化。G 返回导航图。")));
         auto* Floors=WidgetTree->ConstructWidget<UHorizontalBox>();
         Buttons->AddChildToVerticalBox(Floors)->SetPadding(FMargin(0,3,0,8));
         for(int32 Floor=0;Floor<2;++Floor)

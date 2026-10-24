@@ -1,4 +1,4 @@
-#include "CourseworkControlWidget.h"
+﻿#include "CourseworkControlWidget.h"
 #include "CourseworkHUD.h"
 #include "Widgets/SLeafWidget.h"
 #include "Rendering/DrawElements.h"
@@ -99,8 +99,7 @@ public:
         if(Mode==8)
         {
             for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,CourseworkRooms::RowY(I),246,CourseworkRooms::RowY(I)+62,110+CourseworkRooms::DisplayOrder[I]);
-            Add(300,650,472,708,500);Add(484,650,656,708,501);Add(668,650,840,708,502);Add(1050,650,1300,708,503);
-            for(int32 I=0;I<3;++I)Add(1130+92*I,195,1212+92*I,233,510+I);
+            Add(1300,738,1505,782,503);
         }
         if(Mode==9){Add(48,195,246,242,640);Add(48,247,246,294,641);}
         if(Mode==9&&Owner->GetComfortPage()==1){for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,320+49*I,246,367+49*I,110+CourseworkRooms::DisplayOrder[I]);Add(300,552,550,608,650);Add(1050,552,1380,608,652);}
@@ -361,35 +360,56 @@ public:
                 const int32 ID=CourseworkRooms::DisplayOrder[I];const float Y=CourseworkRooms::RowY(I);const bool Selected=ID==Room;
                 if(Selected)Box(52,Y,194,62,Ivory);else if(Hover==110+ID)Box(52,Y,194,62,FLinearColor(1,1,1,.045f));
                 House(68,Y+17,Selected?Ink:Muted);Text(116,Y+5,CourseworkRooms::Get(ID).Name,19,Selected?Ink:Ivory);
-                Text(116,Y+34,FString::Printf(TEXT("%s · %.1f W"),CourseworkRooms::Get(ID).Floor,Owner->GetRoomWatts(ID)),12,Selected?Ink:Muted);
+                Text(116,Y+34,FString::Printf(TEXT("%s  %.1f W"),CourseworkRooms::Get(ID).Floor,Owner->GetRoomWatts(ID)),12,Selected?Ink:Muted);
                 if(Owner->GetRoomWatts(ID)>0)Box(232,Y+28,3,6,Selected?Ink:Gold);
             }
-            Text(300,125,TEXT("照明能耗"),34,Ivory,true);
-            Text(300,227,Owner->GetEnergyScenarioName(),17,Gold);
-            const FString Power=FString::Printf(TEXT("%.1f"),Owner->GetTotalWatts());
-            Text(296,264,Power,76,Ivory,false,true);
-            const float PW=Measure->Measure(Power,FontFor(76,false,true)).X;
-            Text(305+PW,306,TEXT("W"),25,Muted,false,true);
-            Text(300,376,TEXT("照明功率"),14,Muted);
-            Line({{300,412},{796,412}},FLinearColor(.3f,.32f,.33f,.6f));
-            Text(300,437,FString::Printf(TEXT("%s · %s"),CourseworkRooms::Get(Room).Floor,CourseworkRooms::Get(Room).Name),19,Ivory);
-            Text(300,479,FString::Printf(TEXT("%.1f W"),Owner->GetRoomWatts(Room)),35,Ivory,false,true);
-            Line({{842,142},{842,594}},FLinearColor(.3f,.32f,.33f,.45f));
-            Text(884,144,TEXT("电量对比"),22,Ivory);
-            Text(884,201,TEXT("持续时长"),14,Muted);
-            const float Hours[]={1,4,8};
-            for(int32 I=0;I<3;++I){const float X=1130+92.f*I;const bool Selected=FMath::IsNearlyEqual(Owner->GetEnergyHours(),Hours[I]);Rect(X,195,82,38,Selected?Gold:Muted);if(Selected)Box(X+1,196,80,36,FLinearColor(.22f,.20f,.15f,.5f));CenterText(FSlateRect(X,195,X+82,233),FString::Printf(TEXT("%.0f h"),Hours[I]),14,Selected?Ivory:Muted);}
-            const float Baseline=Owner->GetEstimatedKWh(true),Current=Owner->GetEstimatedKWh();
-            Text(884,269,TEXT("全开基准"),16,Muted);Text(1230,261,FString::Printf(TEXT("%.3f kWh"),Baseline),25,Ivory,false,true);
-            Box(884,315,530,7,FLinearColor(.29f,.31f,.32f));
-            Text(884,367,Owner->GetEnergyScenarioName(),16,Muted);Text(1230,359,FString::Printf(TEXT("%.3f kWh"),Current),25,Gold,false,true);
-            Box(884,413,530,7,FLinearColor(.12f,.15f,.16f));Box(884,413,530*Current/Baseline,7,Gold);
-            Text(884,474,FString::Printf(TEXT("比全开少用 %.3f kWh"),Baseline-Current),20,Ivory);
-            Text(884,520,FString::Printf(TEXT("减少 %.1f%%"),(1.f-Current/Baseline)*100),27,Gold,false,true);
-            const TCHAR* Labels[]={TEXT("全开对比"),TEXT("节能对比"),TEXT("恢复原配置")};
-            for(int32 I=0;I<3;++I){const float X=300+184.f*I;const bool Disabled=Owner->IsSafetyDrillRunning()||(I==2&&!Owner->IsEnergyComparisonActive());Rect(X,650,172,58,Disabled?FLinearColor(.23f,.25f,.26f):Hover==500+I?Gold:Muted);CenterText(FSlateRect(X,650,X+172,708),Labels[I],17,Disabled?Muted:Ivory);}
-            Rect(1050,650,250,58,Owner->IsSafetyDrillRunning()?Muted:Hover==503?Gold:Muted);CenterText(FSlateRect(1050,650,1300,708),TEXT("查看用电流向"),17,Owner->IsSafetyDrillRunning()?Muted:Ivory);
-            Text(884,566,TEXT("照明电量估算"),13,Muted);
+            const auto& Flow=Owner->GetSolarFlow();const auto& Meter=Owner->GetSolarMeter();
+            const FLinearColor Green(.53f,.73f,.61f),Idle(.27f,.30f,.32f);
+            Text(300,125,TEXT("家庭能源"),34,Ivory,true);
+            const int32 Minutes=FMath::FloorToInt(Owner->GetDaylightHour()*60)%1440;
+            Text(1170,147,FString::Printf(TEXT("%02d:%02d  %s"),Minutes/60,Minutes%60,Owner->IsTimeFlowing()?TEXT("流动"):TEXT("固定")),18,Muted);
+            Text(300,232,Owner->IsSolarReady()?FString::Printf(TEXT("屋顶光伏  %d 块 / %.2f kWp"),Owner->GetSolarPanelCount(),Owner->GetSolarRatedWatts()/1000.):TEXT("光伏设备未就绪"),17,Owner->IsSolarReady()?Muted:Gold);
+            auto FlowLine=[&](FVector2D A,FVector2D B,double Watts,FLinearColor C)
+            {
+                Line({A,B},Watts>.01?FLinearColor(C.R,C.G,C.B,.45f):Idle,1.4f);
+                if(Watts<=.01)return;
+                const FVector2D D=B-A,Dir=D.GetSafeNormal(),Side(-Dir.Y,Dir.X);
+                const double Phase=FMath::Fmod(Meter.Seconds/60.*FMath::Clamp(18.+Watts*.018,18.,50.),48.);
+                for(double T=Phase;T<D.Size()-5;T+=48.){const FVector2D P=A+Dir*T;Line({P-Dir*6-Side*4,P,P-Dir*6+Side*4},C,1.5f);}
+            };
+            FlowLine({568,375},{787,375},Flow.Generation,Green);
+            const bool Exporting=Flow.Export>.01;
+            FlowLine(Exporting?FVector2D(1007,375):FVector2D(1207,375),Exporting?FVector2D(1207,375):FVector2D(1007,375),Exporting?Flow.Export:Flow.Import,Exporting?Green:Gold);
+            const float Centers[]={458,897,1317};
+            const TCHAR* Names[]={TEXT("屋顶光伏"),TEXT("住宅照明"),TEXT("电网")};
+            for(int32 I=0;I<3;++I)
+            {
+                const float X=Centers[I];Rect(X-110,315,220,120,I==0?Green:Muted);
+                CenterText(FSlateRect(X-110,352,X+110,402),Names[I],24,Ivory);
+            }
+            auto PowerReadout=[&](float Center,const FString& Value,FLinearColor C)
+            {
+                const auto NF=FontFor(48,false,true),UF=FontFor(18,false,true);
+                const float NW=Measure->Measure(Value,NF).X,UW=Measure->Measure(TEXT("W"),UF).X;
+                const float X=Center-(NW+12+UW)*.5f;
+                const FVector2D NI=InkBounds(Value,NF),UI=InkBounds(TEXT("W"),UF);
+                Text(X,460,Value,48,C,false,true);Text(X+NW+12,460+NI.Y-UI.Y,TEXT("W"),18,Muted,false,true);
+            };
+            PowerReadout(458,FString::Printf(TEXT("%.0f"),Flow.Generation),Green);
+            PowerReadout(897,FString::Printf(TEXT("%.1f"),Flow.Load),Ivory);
+            PowerReadout(1317,FString::Printf(TEXT("%.0f"),Exporting?Flow.Export:Flow.Import),Exporting?Green:Gold);
+            CenterText(FSlateRect(348,525,568,554),Flow.Generation>.01?TEXT("正在发电"):TEXT("无日照发电"),15,Muted);
+            CenterText(FSlateRect(787,525,1007,554),FString::Printf(TEXT("%s  %.1f W"),CourseworkRooms::Get(Room).Name,Owner->GetRoomWatts(Room)),15,Muted);
+            CenterText(FSlateRect(1207,525,1427,554),Exporting?TEXT("余电输出"):Flow.Import>.01?TEXT("电网补电"):TEXT("无需交换"),15,Muted);
+            Line({{300,585},{1505,585}},FLinearColor(.3f,.32f,.33f,.45f));
+            Text(300,609,TEXT("本次模拟"),16,Muted);
+            if(Owner->IsEnergySuspended())Text(1370,609,TEXT("累计已暂停"),14,Gold);
+            const TCHAR* Labels[]={TEXT("光伏自用"),TEXT("电网取电"),TEXT("余电输出")};
+            const double Values[]={Meter.SelfUse,Meter.Import,Meter.Export};
+            for(int32 I=0;I<3;++I){const float X=300+410.f*I;Text(X,660,Labels[I],16,Muted);Text(X+130,651,FString::Printf(TEXT("%.3f"),Values[I]),29,I==1?Ivory:Green,false,true);Text(X+240,670,TEXT("kWh"),13,Muted,false,true);}
+            Text(300,751,TEXT("晴天光伏与照明用电模拟"),13,Muted);
+            Text(1300,751,TEXT("楼层用电分布  →"),16,Owner->IsSafetyDrillRunning()?Muted:Hover==503?Gold:Ivory);
+
         }
         else if(Mode==7)
         {
