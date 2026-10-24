@@ -41,7 +41,7 @@ bool ACourseworkDaylight::Apply(float Value)
     if(!FMath::IsFinite(Value))return false;
     if(!bActive)
     {
-        Actors.Empty();Components.Empty();Meshes.Empty();OriginalMeshReferences.Empty();SkyParameters.Empty();
+        Actors.Empty();Components.Empty();Meshes.Empty();OriginalMeshReferences.Empty();SkyParameters.Empty();WeatherSkies.Empty();
         for(TActorIterator<AActor> It(GetWorld());It;++It)
         {
             if(*It==this)continue;
@@ -65,6 +65,9 @@ bool ACourseworkDaylight::Apply(float Value)
                     Infos.Empty();IDs.Empty();MID->GetAllScalarParameterInfo(Infos,IDs);
                     for(const auto& Info:Infos){float ParameterValue=0;if(Info.Name.ToString().Contains(TEXT("brightness"))&&MID->GetScalarParameterValue(Info,ParameterValue))State.Brightness.Add({Info.Name,ParameterValue});}
                     SkyParameters.Add(MoveTemp(State));
+                    FWeatherSky W;W.Mesh=Mesh;W.Slot=Slot;W.Original=MID;OriginalMeshReferences.Emplace(MID);W.Colors=SkyParameters.Last().Colors;W.Brightness=SkyParameters.Last().Brightness;
+                    W.Direction=MID->K2_GetVectorParameterValue(TEXT("Light direction"));
+                    auto* WeatherMID=UMaterialInstanceDynamic::Create(MID->Parent,Mesh);WeatherMID->CopyParameterOverrides(MID);Mesh->SetMaterial(Slot,WeatherMID);W.Material=WeatherMID;WeatherSkies.Add(MoveTemp(W));
                 }
                 if(!Ambient)C->SetVisibility(false,false);
             }
@@ -123,9 +126,9 @@ void ACourseworkDaylight::UpdateLighting()
     // Zero removes a directional light from the render scene and changes the
     // atmosphere's source selection. Keep a negligible 0.00001-unit source
     // registered through the horizon; acceptance checks its actual raw value.
-    Sun->SetIntensity(FMath::Max(.00001f,PreviewWeight*SunStrength*(4+8*FMath::Max(0.f,FMath::Sin(Phase*PI)))));
+    Sun->SetIntensity(FMath::Max(.00001f,PreviewWeight*SunStrength*(4+8*FMath::Max(0.f,FMath::Sin(Phase*PI)))*WeatherDirect));
     Sun->SetLightColor(FMath::Lerp(FLinearColor(1,.53f,.24f),FLinearColor(1,.96f,.87f),FMath::Clamp(SolarElevation/40.f,0.f,1.f)));
-    Sky->SetIntensity(FMath::Lerp(.08f,.9f,DayWeight)*PreviewWeight);
+    Sky->SetIntensity(FMath::Lerp(.08f,.9f*FMath::Lerp(1.f,.78f,(WeatherCover-.1f)/.82f),DayWeight)*PreviewWeight);
     Sky->SetLightColor(FMath::Lerp(FLinearColor(.35f,.5f,1),FLinearColor(1,.98f,.93f),DayWeight));
     // Night uses the authored night exposure, sky and fill lights. Previously
     // selecting 21:00 removed those fills and forced daylight exposure to zero,
@@ -141,9 +144,31 @@ void ACourseworkDaylight::UpdateLighting()
     if(Exposure)Exposure->BlendWeight=DayBlend;
     for(const auto& S:SkyParameters)if(auto* M=S.Material.Get())
     {for(const auto& P:S.Colors)M->SetVectorParameterValue(P.Key,FLinearColor(P.Value.R*NightWeight,P.Value.G*NightWeight,P.Value.B*NightWeight,P.Value.A));for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value*NightWeight);}
+    const float Cloud=FMath::Clamp((WeatherCover-.1f)/.82f,0.f,1.f);
+    // Clear sky stays with the atmosphere. Fade the optional cloud dome over
+    // a broad elevation range; multiplying its original night tint by a white
+    // daytime tint near zero elevation caused an abrupt horizon brightening.
+    const float SkyDay=Cloud*FMath::SmoothStep(0.f,30.f,SolarElevation);
+    for(const auto& S:WeatherSkies)if(auto* M=S.Material.Get())
+    {
+        for(const auto& P:S.Colors)
+        {
+            FLinearColor Day=P.Value;
+            if(P.Key==TEXT("Overall Color"))Day=FLinearColor::White;
+            if(P.Key==TEXT("Zenith Color"))Day=FMath::Lerp(FLinearColor(.025f,.12f,.28f),FLinearColor(.22f,.25f,.29f),Cloud);
+            if(P.Key==TEXT("Horizon color"))Day=FMath::Lerp(FLinearColor(.38f,.60f,.82f),FLinearColor(.48f,.51f,.55f),Cloud);
+            if(P.Key==TEXT("Cloud color"))Day=FMath::Lerp(FLinearColor(.86f,.9f,.96f),FLinearColor(.36f,.39f,.43f),Cloud);
+            M->SetVectorParameterValue(P.Key,FLinearColor(P.Value.R*NightWeight+Day.R*SkyDay,P.Value.G*NightWeight+Day.G*SkyDay,P.Value.B*NightWeight+Day.B*SkyDay,P.Value.A));
+        }
+        for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value*NightWeight*(P.Key==TEXT("Stars brightness")?1-Cloud*.9f:1));
+        M->SetScalarParameterValue(TEXT("Cloud opacity"),FMath::Lerp(.22f,4.5f,Cloud));
+        M->SetScalarParameterValue(TEXT("Cloud speed"),.03f);
+        M->SetScalarParameterValue(TEXT("Sun height"),FMath::Max(0.f,SolarElevation/90));
+        const FVector D=Sun->GetForwardVector();M->SetVectorParameterValue(TEXT("Light direction"),FMath::Lerp(S.Direction,FLinearColor(D.X,D.Y,D.Z,1),DayWeight));
+    }
     Sky->SetVisibility(true);Sun->SetVisibility(true);
     for(const auto& S:Actors)if(auto* A=S.Actor.Get())
-        A->SetActorHiddenInGame(S.Hidden||A->FindComponentByClass<USkyLightComponent>()||(!OriginalNight&&A->GetClass()->GetName().Contains(TEXT("Sky"))));
+        A->SetActorHiddenInGame(S.Hidden||A->FindComponentByClass<USkyLightComponent>()||(!WeatherSkies.Num()&&!OriginalNight&&A->GetClass()->GetName().Contains(TEXT("Sky"))));
     for(const auto& S:Components)if(auto* C=S.Component.Get())
     {
         if(Cast<USkyLightComponent>(C)){C->SetVisibility(false,false);continue;}
@@ -156,7 +181,7 @@ void ACourseworkDaylight::UpdateLighting()
             if(S.AmbientIntensity>=0)L->SetIntensity(S.AmbientIntensity*(C->GetOwner()->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))?1-DayBlend:NightWeight));
             C->SetVisibility(S.Visible,false);
         }
-        else C->SetVisibility(S.Visible&&(!C->GetOwner()->GetClass()->GetName().Contains(TEXT("Sky"))||OriginalNight),false);
+        else C->SetVisibility(S.Visible&&(!C->GetOwner()->GetClass()->GetName().Contains(TEXT("Sky"))||OriginalNight||WeatherSkies.Num()>0),false);
     }
     // Re-entering daytime must follow the same ordering as first activation.
     // UE checks the render scene for static sky lights when adding atmosphere;
@@ -171,6 +196,7 @@ void ACourseworkDaylight::Restore()
     GetWorld()->GetTimerManager().ClearTimer(AtmosphereTimer);
     Sun->SetVisibility(false);Sun->SetIntensity(0);Atmosphere->SetVisibility(false);Sky->SetVisibility(false);
     if(Exposure){Exposure->Destroy();Exposure=nullptr;}
+    for(const auto& S:WeatherSkies)if(S.Mesh.IsValid()&&S.Original.IsValid())S.Mesh->SetMaterial(S.Slot,S.Original.Get());WeatherSkies.Empty();
     for(const auto& S:SkyParameters)if(auto* M=S.Material.Get()){for(const auto& P:S.Colors)M->SetVectorParameterValue(P.Key,P.Value);for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value);}
     for(const auto& S:Meshes)if(auto* C=S.Component.Get())if(auto* M=S.Original.Get())C->SetStaticMesh(M);
     for(const auto& State:Actors)if(auto* A=State.Actor.Get()){A->SetActorHiddenInGame(State.Hidden);A->SetActorTickEnabled(State.Tick);}
@@ -198,6 +224,8 @@ bool ACourseworkDaylight::CheckRestored()const
 }
 float ACourseworkDaylight::GetSunIntensity()const{return Sun->Intensity;}
 FRotator ACourseworkDaylight::GetSunRotation()const{return Sun->GetComponentRotation();}
+void ACourseworkDaylight::SetWeather(float Cover,float Direct,float Diffuse,float Light)
+{WeatherCover=FMath::Clamp(Cover,.1f,.92f);WeatherDirect=FMath::Clamp(Direct,.01f,1.f);WeatherDiffuse=Diffuse;WeatherLight=Light;}
 bool ACourseworkDaylight::IsSunShadowed()const{return Sun->CastShadows&&Sun->DynamicShadowDistanceMovableLight>=5000;}
 void ACourseworkDaylight::EndPlay(const EEndPlayReason::Type Reason){Restore();Super::EndPlay(Reason);}
 

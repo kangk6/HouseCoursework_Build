@@ -154,6 +154,7 @@ void ACourseworkHUD::BeginPlay()
 
 void ACourseworkHUD::EndPlay(const EEndPlayReason::Type Reason)
 {
+    RestoreHousehold();
     SetSmartLightingScene(0);
     RestoreDaylight();
     if(Ventilation)Ventilation->RestoreOriginals();
@@ -247,6 +248,7 @@ void ACourseworkHUD::Tick(float DeltaSeconds)
     HintElapsed += DeltaSeconds;
     TickTimeOfDay(DeltaSeconds);
     TickSafety(DeltaSeconds);
+    TickHousehold(DeltaSeconds);
     TickSmartLighting(DeltaSeconds);
     TickSolar(DeltaSeconds);
     if(Ventilation)Ventilation->Suspend(IsSafetyDrillRunning());
@@ -259,7 +261,7 @@ void ACourseworkHUD::Tick(float DeltaSeconds)
 
 void ACourseworkHUD::UpdateInteraction()
 {
-    TargetActor.Reset(); TargetComponent.Reset(); TargetLabel.Empty();TargetLightRoom=INDEX_NONE;TargetLightFixture.Reset();TargetWindow=INDEX_NONE;
+    TargetActor.Reset(); TargetComponent.Reset(); TargetLabel.Empty();TargetLightRoom=INDEX_NONE;TargetLightFixture.Reset();TargetWindow=INDEX_NONE;TargetAppliance=INDEX_NONE;
     if(bLightKeyHeld){RefreshLightInteraction();return;}
     auto* PC = GetOwningPlayerController();
     if (!PC || !PC->GetPawn()) return;
@@ -271,6 +273,7 @@ void ACourseworkHUD::UpdateInteraction()
     auto SetHit=[&](const FHitResult& Selected)->bool
     {
         if(SetWindowTarget(Selected))return true;
+        if(SetApplianceTarget(Selected))return true;
         if(SetLightTarget(Selected))return true;
         if(Selected.Distance>230.f)return false;
         auto* Actor = Selected.GetActor();
@@ -412,6 +415,7 @@ void ACourseworkHUD::Interact()
 {
     if (PanelMode != 0 || GetWorld()->GetRealTimeSeconds() < NextInteractionTime) return;
     UpdateInteraction();
+    if(TargetAppliance!=INDEX_NONE){ToggleAppliance(TargetAppliance);NextInteractionTime=GetWorld()->GetRealTimeSeconds()+.25;UpdateInteraction();return;}
     if(TargetWindow!=INDEX_NONE&&Ventilation)
     {
         if(IsSafetyDrillRunning()){ShowToast(TEXT("演练期间请优先疏散"));return;}
@@ -495,6 +499,7 @@ void ACourseworkHUD::TickAcceptanceTest()
     if(TestMode==TEXT("daylight")){TickDaylightAcceptance();return;}
     if(TestMode==TEXT("energy")){TickEnergyAcceptance();return;}
     if(TestMode==TEXT("solar")){TickSolarAcceptance();return;}
+    if(TestMode==TEXT("household_weather")){TickHouseholdAcceptance();return;}
     if(TestMode==TEXT("fixture")) {TickFixtureAcceptance();return;}
     if(TestMode.StartsWith(TEXT("evacuation"))||TestMode==TEXT("safety")||TestMode==TEXT("safety_perf")) { TickEvacuationAcceptance(); return; }
     if(TestMode==TEXT("lighting")) { TickLightingAcceptance(); return; }

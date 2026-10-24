@@ -229,7 +229,7 @@ void ACourseworkHUD::TickSmartLighting(float Dt)
         bSmartReadingOccupied=Now<SmartReadingUntil;
     }
     // Daylight supplement is a teaching estimate, not a lux sensor reading.
-    const float Sun=IsDaylightActive()?FMath::Clamp(GetDaylightElevation()/50.f,0.f,1.f):0.f;
+    const float Sun=IsDaylightActive()?FMath::Clamp(GetDaylightElevation()/50.f,0.f,1.f)*GetWeatherDaylight():0.f;
     const float ReadingLevel=FMath::Lerp(.85f,.30f,Sun);
     for(auto& Pair:SmartFixtures)
     {

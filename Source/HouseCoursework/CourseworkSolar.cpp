@@ -67,9 +67,9 @@ void ACourseworkHUD::TickSolar(float DeltaSeconds)
     if(Daylight&&Daylight->IsActive())
     {
         const FVector ToSun=-Daylight->GetSunRotation().Vector();
-        for(const auto& Panel:SolarPanels)Power+=CourseworkSolar::Power(ToSun,Panel.Normal,360.);
+        for(const auto& Panel:SolarPanels)Power+=CourseworkSolar::Power(ToSun,Panel.Normal,360.,Weather.Direct(),Weather.Diffuse());
     }
-    SolarFlow=FCourseworkSolarFlow::Balance(Power,GetTotalWatts());
+    SolarFlow=FCourseworkSolarFlow::Balance(Power,GetHouseholdWatts());
     // Fixed solar time still consumes energy. Seeking supplies no elapsed time.
     // DeltaSeconds follows game time; native pause policy additionally gates it.
     if(!IsEnergySuspended()&&FMath::IsFinite(DeltaSeconds)&&DeltaSeconds>0)

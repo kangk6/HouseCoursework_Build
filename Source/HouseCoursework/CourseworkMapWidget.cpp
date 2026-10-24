@@ -1,4 +1,4 @@
-#include "CourseworkMapWidget.h"
+﻿#include "CourseworkMapWidget.h"
 #include "CourseworkHUD.h"
 #include "GameFramework/PlayerController.h"
 #include "Widgets/SLeafWidget.h"
@@ -162,16 +162,16 @@ public:
                 FSlateDrawElement::MakeText(Out,Layer+10,G.ToPaintGeometry(Size,FSlateLayoutTransform(P)),T,Font,ESlateDrawEffect::None,C);
             };
             const FVector2D Supply=Project({-2540,8890},Size),Hub=Project({-2040,8990},Size);
-            const bool Powered=Owner->GetTotalWatts()>.001f;const FLinearColor Main=Powered?Flow:Idle;
+            const bool Powered=Owner->GetHouseholdWatts()>.001f;const FLinearColor Main=Powered?Flow:Idle;
             Line({Supply,Hub},Main,2,Layer+6);Box(Supply-FVector2D(4),{8,8},Main,Layer+7);
             if(Powered){const FVector2D D=Hub-Supply,Dir=D.GetSafeNormal(),Side(-Dir.Y,Dir.X);const float Phase=FMath::Fmod(Owner->GetWorld()->GetTimeSeconds()*25.f,32.f);for(float T=Phase;T<D.Size();T+=32){const FVector2D P=Supply+Dir*T;Line({P-Dir*3-Side*2,P,P-Dir*3+Side*2},Main,1.2f,Layer+7);}}
             EnergyText(Supply+FVector2D(-5,-20),TEXT("住宅电源"),Paper);
-            EnergyText(Hub+FVector2D(5,-20),TEXT("照明配电"),Paper);
+            EnergyText(Hub+FVector2D(5,-20),TEXT("住宅配电"),Paper);
             Box(Hub-FVector2D(3),{6,6},Main,Layer+7);
             for(int32 I=0;I<CourseworkRooms::Count;++I)
             {
                 const bool Upper=I==1||I==3||I==4||I==6||I==8;if(int32(Upper)!=Floor)continue;
-                const auto& R=CourseworkRooms::Get(I);const float Power=Owner->GetRoomWatts(I);const bool Active=Power>.001f;
+                const auto& R=CourseworkRooms::Get(I);const float Power=Owner->GetRoomDemandWatts(I);const bool Active=Power>.001f;
                 const FVector2D End=Project({R.Position.X,R.Position.Y},Size),Joint=Project({-2040,R.Position.Y},Size);
                 const TArray<FVector2D> Path={Hub,Joint,End};const FLinearColor C=Active?Flow:Idle;
                 Line(Path,FLinearColor(0,0,0,.85f),4,Layer+5);Line(Path,C,Active?1.5f:1.f,Layer+6);
@@ -188,7 +188,7 @@ public:
                 Box(LabelAt-FVector2D(2),{float(Label.Len()*15+8),23},FLinearColor(.01f,.015f,.018f,.97f),Layer+9);
                 EnergyText(LabelAt,Label,Active?Paper:Idle);
             }
-            EnergyText({14,Size.Y-32},TEXT("照明用电估算"),Paper);
+            EnergyText({14,Size.Y-32},TEXT("住宅用电估算"),Paper);
         }
         if(!Owner.IsValid() || Owner->GetPlayerFloor()==Floor)
         {

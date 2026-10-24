@@ -30,13 +30,13 @@ namespace CourseworkSolar
 {
 // Fixed clear-sky approximation. Altitude attenuates DNI; tilt sets diffuse view.
 // No seasonal/weather/temperature/occlusion forecast is implied.
-inline double Power(FVector ToSun,FVector Normal,double RatedWatts)
+inline double Power(FVector ToSun,FVector Normal,double RatedWatts,double DirectFactor=1,double DiffuseFactor=1)
 {
     if(ToSun.ContainsNaN()||Normal.ContainsNaN()||!FMath::IsFinite(RatedWatts)||RatedWatts<=0)return 0;
     ToSun=ToSun.GetSafeNormal();Normal=Normal.GetSafeNormal();
     const double Height=ToSun.Z;if(Height<=0||Normal.IsNearlyZero())return 0;
-    const double DNI=900.*FMath::SmoothStep(0.,.25,Height);
-    const double Diffuse=100.*Height*(1.+FMath::Clamp(Normal.Z,-1.,1.))*.5;
+    const double DNI=900.*FMath::SmoothStep(0.,.25,Height)*FMath::Clamp(DirectFactor,0.,1.);
+    const double Diffuse=100.*Height*(1.+FMath::Clamp(Normal.Z,-1.,1.))*.5*FMath::Clamp(DiffuseFactor,0.,2.);
     const double POA=DNI*FMath::Max(0.,FVector::DotProduct(ToSun,Normal))+Diffuse;
     // Nameplate already includes panel conversion. 0.90 combines remaining losses.
     return FMath::Min(RatedWatts,RatedWatts*POA/1000.*.90);

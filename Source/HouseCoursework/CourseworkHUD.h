@@ -3,6 +3,7 @@
 #include "CourseworkRooms.h"
 #include "CourseworkClock.h"
 #include "CourseworkSolarModel.h"
+#include "CourseworkWeatherModel.h"
 #include "GameFramework/HUD.h"
 #include "CourseworkHUD.generated.h"
 class UCourseworkOverlay;
@@ -67,10 +68,30 @@ public:
     int32 GetSolarPanelCount()const{return SolarPanels.Num();}
     bool IsSolarReady()const{return SolarPanels.Num()==6;}
     bool IsEnergySuspended()const;
+    float GetApplianceWatts()const;
+    float GetHouseholdWatts()const{return GetTotalWatts()+GetApplianceWatts();}
+    float GetRoomDemandWatts(int32 Room)const;
+    int32 GetApplianceCount()const{return Appliances.Num();}
+    FString GetApplianceName(int32 Index)const;
+    FString GetApplianceStatus(int32 Index)const;
+    int32 GetApplianceRoom(int32 Index)const;
+    float GetAppliancePower(int32 Index)const;
+    bool IsApplianceOn(int32 Index)const;
+    bool ToggleAppliance(int32 Index);
+    int32 GetEnergyPage()const{return EnergyPage;}
+    void SelectEnergyPage(int32 Page){EnergyPage=FMath::Clamp(Page,0,1);}
+    void ChooseWeather(int32 Kind);
+    void ToggleAutomaticWeather();
+    bool IsAutomaticWeather()const{return Weather.Automatic;}
+    int32 GetWeatherKind()const{return Weather.Kind;}
+    FString GetWeatherName()const;
+    float GetWeatherCloudCover()const{return Weather.Cover;}
+    float GetWeatherTransition()const{return float(Weather.BlendAge/10);}
+    float GetWeatherDaylight()const{return Weather.Daylight();}
 
 
     int32 GetComfortPage()const{return ComfortPage;}
-    void SelectComfortPage(int32 Page){if(ComfortPage!=FMath::Clamp(Page,0,1)){ComfortPage=FMath::Clamp(Page,0,1);++TimeEditorRevision;}}
+    void SelectComfortPage(int32 Page){if(ComfortPage!=FMath::Clamp(Page,0,2)){ComfortPage=FMath::Clamp(Page,0,2);++TimeEditorRevision;}}
     int32 GetTimeEditorRevision()const{return TimeEditorRevision;}
     bool IsStartupCovered()const{return bStartupCover;}
     int32 GetRoomWindowCount(int32 Room)const;
@@ -151,6 +172,18 @@ private:
     void TickFixtureAcceptance();
     void TickEnergyAcceptance();
     void TickSolarAcceptance();
+    void TickHouseholdAcceptance();
+    void InitializeHousehold();
+    void TickHousehold(float DeltaSeconds);
+    void RestoreHousehold();
+    bool SetApplianceTarget(const FHitResult& Hit);
+    struct FAppliance {FString Name;int32 Room=0;bool On=false,Fridge=false;float Watts=0;TWeakObjectPtr<UStaticMeshComponent> Mesh;TWeakObjectPtr<class UMaterialInstanceDynamic> Screen;TWeakObjectPtr<class UMaterialInterface> Original;int32 Slot=INDEX_NONE;TWeakObjectPtr<UStaticMeshComponent> Overlay;};
+    TArray<FAppliance> Appliances;
+    TMap<TWeakObjectPtr<class UPrimitiveComponent>,int32> ApplianceTargets;
+    UPROPERTY() TObjectPtr<class UTexture2D> DesktopTexture;
+    int32 TargetAppliance=INDEX_NONE,EnergyPage=0;
+    double ApplianceSeconds=0;
+    FCourseworkWeather Weather;
     void InitializeSolar();
     void TickSolar(float DeltaSeconds);
     FCourseworkSolarFlow SolarFlow;

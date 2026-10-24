@@ -23,6 +23,7 @@ public:
     float GetRenderedHour()const{return RenderedHour;}
     bool UsesRealtimeSky()const;
     FRotator GetSunRotation()const;
+    void SetWeather(float Cover,float Direct,float Diffuse,float Light);
     bool IsSunShadowed()const;
     virtual void Tick(float DeltaSeconds)override;
     virtual void EndPlay(const EEndPlayReason::Type Reason)override;
@@ -31,6 +32,9 @@ private:
     struct FComponentState {TWeakObjectPtr<USceneComponent> Component;bool Visible;float AmbientIntensity=-1,FogDensity=-1,SecondFogDensity=-1;bool AtmosphereSun=false;float FogMaxOpacity=-1;};
     struct FSkyParameters {TWeakObjectPtr<class UMaterialInstanceDynamic> Material;TArray<TPair<FName,FLinearColor>> Colors;TArray<TPair<FName,float>> Brightness;};
     TArray<FSkyParameters> SkyParameters;
+    struct FWeatherSky{TWeakObjectPtr<class UStaticMeshComponent> Mesh;int32 Slot=0;TWeakObjectPtr<class UMaterialInterface> Original;TWeakObjectPtr<class UMaterialInstanceDynamic> Material;TArray<TPair<FName,FLinearColor>> Colors;TArray<TPair<FName,float>> Brightness;FLinearColor Direction;};
+    TArray<FWeatherSky> WeatherSkies;
+    float WeatherCover=.1f,WeatherDirect=1,WeatherDiffuse=1,WeatherLight=1;
     struct FMeshState {TWeakObjectPtr<class UStaticMeshComponent> Component;TWeakObjectPtr<class UStaticMesh> Original;};
     TArray<FMeshState> Meshes;
     TArray<TStrongObjectPtr<UObject>> OriginalMeshReferences;
