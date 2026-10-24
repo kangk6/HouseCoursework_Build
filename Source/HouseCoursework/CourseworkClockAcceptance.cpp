@@ -65,7 +65,7 @@ void ACourseworkHUD::TickClockAcceptance()
         SetDaylightHour(23.99f);R.Day=Clock.Day;SetPanel(0);break;
     case 3:
         Check(TEXT("natural_midnight_crosses_day"),Clock.Day==R.Day+1&&Clock.Hour<.5);
-        Check(TEXT("midnight_never_sweeps_through_noon"),Daylight->GetRenderedHour()<.5&&Daylight->GetSunIntensity()==0);
+        Check(TEXT("midnight_never_sweeps_through_noon"),Daylight->GetRenderedHour()<.5&&Daylight->GetSunIntensity()<=.00002f);
         Shot(TEXT("Clock_midnight.png"));SetTimeFlowing(false);R.Elapsed=Clock.ElapsedSimulationSeconds;R.Day=Clock.Day;
         Check(TEXT("manual_zero_supported"),SetDaylightHour(0)&&Clock.Hour==0);Check(TEXT("manual_24_supported"),SetDaylightHour(24)&&Clock.Hour==0);
         Check(TEXT("manual_negative_supported"),SetDaylightHour(-1)&&Clock.Hour==23);SetDaylightHour(12);
@@ -76,7 +76,7 @@ void ACourseworkHUD::TickClockAcceptance()
         Check(TEXT("energy_comparison_coexists_with_clock"),ApplyEnergyScenario(true)&&Clock.Hour==12&&!Clock.bRunning);RestoreEnergyComparison();
         Check(TEXT("energy_restores_original_settings"),LightsSame());SetRoomWindows(0,true);SetDaylightHour(0);break;
     case 5:
-        Check(TEXT("midnight_sun_is_zero"),Daylight->GetSunIntensity()==0&&NeedsNightLighting());
+        Check(TEXT("midnight_sun_is_negligible"),Daylight->GetSunIntensity()<=.00002f&&NeedsNightLighting());
         Check(TEXT("windows_remain_open_across_time_changes"),GetRoomOpenWindowCount(0)==GetRoomWindowCount(0));
         Place(FVector(-2114,9980,413),FVector(-2008,10177,508));SetSmartLightingScene(1);break;
     case 6:
@@ -110,7 +110,7 @@ void ACourseworkHUD::TickClockAcceptance()
     case 18:Shot(TEXT("Clock_after_sunset.png"));SetDaylightHour(23.95f);break;
     case 19:R.Hour=Daylight->GetRenderedHour();SetDaylightHour(.05f);break;
     case 20:
-        Check(TEXT("manual_midnight_wrap_is_short"),Daylight->GetRenderedHour()<.1&&Daylight->GetSunIntensity()==0);
+        Check(TEXT("manual_midnight_wrap_is_short"),Daylight->GetRenderedHour()<.1&&Daylight->GetSunIntensity()<=.00002f);
         Check(TEXT("no_new_unbuilt_lighting"),GetWorld()->NumLightingUnbuiltObjects==0);
         Check(TEXT("manual_modes_do_not_touch_saved_room_preferences"),LightsSame());CloseAllWindows();SetDaylightHour(12);SetPanel(9);SetTimeFlowing(true);SetTimeDayMinutes(24);break;
     case 21:Shot(TEXT("Clock_panel_flow.png"));break;

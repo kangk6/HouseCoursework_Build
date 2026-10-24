@@ -28,7 +28,9 @@ public:
     virtual void EndPlay(const EEndPlayReason::Type Reason)override;
 private:
     struct FActorState {TWeakObjectPtr<AActor> Actor;bool Hidden;bool Tick;};
-    struct FComponentState {TWeakObjectPtr<USceneComponent> Component;bool Visible;float AmbientIntensity=-1;};
+    struct FComponentState {TWeakObjectPtr<USceneComponent> Component;bool Visible;float AmbientIntensity=-1,FogDensity=-1,SecondFogDensity=-1;bool AtmosphereSun=false;float FogMaxOpacity=-1;};
+    struct FSkyParameters {TWeakObjectPtr<class UMaterialInstanceDynamic> Material;TArray<TPair<FName,FLinearColor>> Colors;TArray<TPair<FName,float>> Brightness;};
+    TArray<FSkyParameters> SkyParameters;
     struct FMeshState {TWeakObjectPtr<class UStaticMeshComponent> Component;TWeakObjectPtr<class UStaticMesh> Original;};
     TArray<FMeshState> Meshes;
     TArray<TStrongObjectPtr<UObject>> OriginalMeshReferences;

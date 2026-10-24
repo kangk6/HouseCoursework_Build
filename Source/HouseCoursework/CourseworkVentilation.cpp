@@ -125,7 +125,7 @@ FString ACourseworkVentilation::GetRoomStatus(int32 Room)const
  return GetWindowCount(Room)>0?TEXT("窗户关闭 · 自然换气较弱"):TEXT("无直接外窗 · 依靠相邻空间");
 }
 void ACourseworkVentilation::SetDisplay(bool V){bDisplay=V;}
-void ACourseworkVentilation::Suspend(bool V){if(bSuspended==V)return;bSuspended=V;if(V)bDisplay=false;LastState=MAX_uint64;}
+void ACourseworkVentilation::Suspend(bool V){if(bSuspended==V)return;bSuspended=V;LastState=MAX_uint64;}
 int32 ACourseworkVentilation::GetCrossPathCount()const{int32 N=0;for(const auto& P:Paths)if(P.Cross)++N;return N;}
 int32 ACourseworkVentilation::GetOpenExteriorDoorCount()const{int32 N=0;for(const auto& D:Doors)if(D.B<0&&D.Amount>.95f)++N;return N;}
 void ACourseworkVentilation::Tick(float Dt)

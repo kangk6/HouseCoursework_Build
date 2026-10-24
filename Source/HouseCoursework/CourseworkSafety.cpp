@@ -1,6 +1,6 @@
 #include "CourseworkHUD.h"
 #include "CourseworkOverlay.h"
-#include "CourseworkOverlay.h"
+#include "CourseworkVentilation.h"
 #include "Components/AudioComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -86,6 +86,11 @@ FString ACourseworkHUD::GetSafetyStatus()const
 void ACourseworkHUD::TriggerKitchenAlarm()
 {
     if(IsSafetyDrillRunning()||!IsSafetyReady())return;
+    SafetySavedSmartScene=SmartLightingScene;
+    SafetySavedFixtureOverrides=SmartFixtureOverrides;
+    SafetySavedFixtureRestore.Empty();
+    for(const auto& Override:SmartFixtureOverrides)if(const auto* Fixture=SmartFixtures.Find(Override.Key))SafetySavedFixtureRestore.Add(Override.Key,Fixture->Restore);
+    SafetySavedManualRooms=SmartManualRooms;
     SetSmartLightingScene(0);
     // A drill changes the hazard state, not the user's selected time of day.
     RestoreEnergyComparison();bEnergyMapLayer=false;
@@ -102,8 +107,9 @@ void ACourseworkHUD::HandleKitchenAlarm()
     if(SafetyState!=3||!bPlayerGathered||!HasResidentGathered())return;
     ResetKitchenAlarm();
 }
-void ACourseworkHUD::ResetKitchenAlarm()
+void ACourseworkHUD::ResetKitchenAlarm(bool ResumeEnvironment)
 {
+    const bool WasRunning=IsSafetyDrillRunning();
     if(IsSafetyDrillRunning())LastEvacuationResult=SafetyState==3?
         FString::Printf(TEXT("上次演练：两人均已集合 · %.1f 秒"),FMath::Max(PlayerArrivalTime,ResidentArrivalTime)):TEXT("上次演练已中止 · 未判定疏散完成");
     RestoreResident();SafetyState=0;SmokeReading=0;AlarmElapsed=0;SafetySmokeLevel=0;
@@ -114,6 +120,22 @@ void ACourseworkHUD::ResetKitchenAlarm()
     if(SafetySiren)SafetySiren->Stop();
     if(SafetySirenWave)SafetySirenWave->ResetAudio();
     if(IsValid(AssemblyMarker))AssemblyMarker->SetActorHiddenInGame(true);
+    if(WasRunning&&ResumeEnvironment)
+    {
+        if(Ventilation)Ventilation->Suspend(false);
+        if(SafetySavedSmartScene&&SetSmartLightingScene(SafetySavedSmartScene))
+        {
+            SmartFixtureOverrides=SafetySavedFixtureOverrides;
+            SmartManualRooms=SafetySavedManualRooms;
+            for(const auto& Override:SmartFixtureOverrides)if(auto* Fixture=SmartFixtures.Find(Override.Key))
+            {Fixture->Level=Fixture->Target=Override.Value;Fixture->Restore=SafetySavedFixtureRestore.FindRef(Override.Key);}
+            // Presence and route timers are evaluated afresh at the current
+            // position. Preserve user choices, not expired sensor outputs.
+            TickSmartLighting(0);
+        }
+        UE_LOG(LogTemp,Display,TEXT("SAFETY_ENVIRONMENT_RESUMED scene=%d overrides=%d rooms=%d hour=%.5f flowing=%d"),SmartLightingScene,SmartFixtureOverrides.Num(),SmartManualRooms.Num(),Clock.Hour,Clock.bRunning);
+    }
+    SafetySavedSmartScene=0;SafetySavedFixtureOverrides.Empty();SafetySavedFixtureRestore.Empty();SafetySavedManualRooms.Empty();
     UE_LOG(LogTemp,Display,TEXT("SAFETY_STATE drill_reset"));
 }
 void ACourseworkHUD::TickSafety(float DeltaSeconds)

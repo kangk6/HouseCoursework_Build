@@ -158,7 +158,7 @@ void ACourseworkHUD::EndPlay(const EEndPlayReason::Type Reason)
     RestoreDaylight();
     if(Ventilation)Ventilation->RestoreOriginals();
     RestoreEnergyComparison();
-    ResetKitchenAlarm();
+    ResetKitchenAlarm(false);
     SaveRoomLighting();
     if (Overlay) Overlay->RemoveFromParent();
     if (bMenuInputBlocked)
@@ -487,6 +487,8 @@ void ACourseworkHUD::TickAcceptanceTest()
     if(TestMode==TEXT("ventilation_perf")){TickVentilationPerformance();return;}
     if(TestMode==TEXT("ventilation")||TestMode==TEXT("ventilation_view")){TickVentilationAcceptance();return;}
     if(TestMode==TEXT("clock")){TickClockAcceptance();return;}
+    if(TestMode==TEXT("day_cycle")){TickDayCycleAcceptance();return;}
+    if(TestMode==TEXT("drill_restore")){TickDrillRestoreAcceptance();return;}
     if(TestMode==TEXT("dial")){TickDialAcceptance();return;}
     if(TestMode==TEXT("daylight_sweep")){TickDaylightSweep();return;}
     if(TestMode==TEXT("daylight")){TickDaylightAcceptance();return;}

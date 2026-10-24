@@ -1,5 +1,8 @@
 #include "CourseworkHUD.h"
 #include "CourseworkOverlay.h"
+#include "CourseworkVentilation.h"
+#include "CourseworkDaylight.h"
+#include "Misc/CommandLine.h"
 #include "Animation/AnimSingleNodeInstance.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/BlendSpace1D.h"
@@ -35,6 +38,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         TWeakObjectPtr<AActor> Barrier;
         TWeakObjectPtr<ACameraActor> Camera;
         TWeakObjectPtr<ACameraActor> KitchenCamera;
+        double FireHour=0,FireElapsed=0;float Hour=21;bool Flow=false;int32 Scene=1;
     };
     static FRun R;
     const double Now=GetWorld()->GetRealTimeSeconds();
@@ -56,7 +60,11 @@ void ACourseworkHUD::TickEvacuationAcceptance()
     if(TestCase<0)
     {
         TestCase=0;R=FRun();R.Started=R.StageAt=Now;
+        FParse::Value(FCommandLine::Get(),TEXT("HouseEvacHour="),R.Hour);R.Flow=FParse::Param(FCommandLine::Get(),TEXT("HouseEvacFlow"));R.Scene=R.Hour<18?2:1;
+        SetDaylightHour(R.Hour);SetTimeFlowing(R.Flow);
         for(int32 I=0;I<CourseworkRooms::Count;++I)SetRoomLighting(I,I%2==0,I==2?1.f:.2f+.07f*I);
+        SetSmartLightingScene(R.Scene);SetSmartFixtureManual(TEXT("SM_TableLamp_A1_32"),.42f);
+        SetRoomWindows(0,true);Ventilation->SetDisplay(true);
         if(SafetyEntryDoor.IsValid()&&IsFurnitureOpen(SafetyEntryDoor.Get()))InvokeFurniture(SafetyEntryDoor->GetOwner(),SafetyEntryDoor.Get());
         const bool Upper=TestMode==TEXT("evacuation_upper");
         Player->TeleportTo(Upper?FVector(-2280,9470,413):FVector(-1990,10228,150),FRotator::ZeroRotator,false,false);
@@ -110,6 +118,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
     {
     case 0:
         if(Now-R.StageAt<1.7)return;
+        R.FireHour=Clock.Hour;R.FireElapsed=Clock.ElapsedSimulationSeconds;
         Record(TEXT("start_pointer_enters_sensor_monitoring"),Click(400,613)&&SafetyState==1&&!SafetySiren->IsPlaying());R.Stage=1;break;
     case 1:
         if(SafetyState!=2)return;
@@ -117,7 +126,8 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         if(AlarmElapsed<.4f)return;SetPanel(7);
         Record(TEXT("sensor_threshold_triggers_alarm"),SmokeReading>=30&&SafetySiren->IsPlaying());
         Record(TEXT("visible_fire_and_local_light"),SafetyFire&&SafetyFire->IsActive()&&SafetyFire->GetNumActiveParticles()>0&&SafetyFireLight&&SafetyFireLight->Intensity>200);
-        Record(TEXT("early_finish_rejected"),Click(580,613)&&SafetyState==2);
+        HandleKitchenAlarm();Record(TEXT("early_finish_rejected"),SafetyState==2);
+        Record(TEXT("environment_held_through_alarm"),Clock.Hour==R.FireHour&&Clock.ElapsedSimulationSeconds==R.FireElapsed&&SmartLightingScene==0&&!Ventilation->IsDisplayed());
         {const FVector Before=Player->GetActorLocation();GoToLocation(0);Record(TEXT("navigation_cannot_fake_evacuation"),FVector::Dist(Before,Player->GetActorLocation())<2);}
         SetPanel(0);
         if(R.Camera.IsValid())R.Camera->Destroy();
@@ -165,18 +175,22 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         if(Now-R.StageAt<.8)return;
         if(!R.GatheredShot){Shot(TEXT("Evacuation_gathered.png"));R.GatheredShot=true;return;}
         if(Now-R.StageAt<1.5)return;
-        Record(TEXT("end_pointer_after_both_arrive"),Click(580,613)&&SafetyState==0);R.Stage=4;R.StageAt=Now;break;
+        Record(TEXT("end_pointer_after_both_arrive"),Click(420,613)&&SafetyState==0);R.Stage=4;R.StageAt=Now;break;
     case 4:
         if(Now-R.StageAt<2)return;
         Record(TEXT("reset_restores_original_idle"),!EvacuatingResident&&OriginalResident.IsValid()&&!OriginalResident->IsHidden()&&OriginalResident->GetActorTransform().Equals(OriginalResidentTransform,.1f));
         Record(TEXT("reset_clears_fire_and_light"),SafetyFire&&!SafetyFire->IsActive()&&SafetyFireLight&&SafetyFireLight->Intensity==0);
         Record(TEXT("entry_door_restored"),!IsFurnitureOpen(SafetyEntryDoor.Get()));
-        {bool Lights=true;for(int32 I=0;I<CourseworkRooms::Count;++I)Lights &=IsRoomLightOn(I)==(I%2==0)&&FMath::IsNearlyEqual(GetRoomBrightness(I),I==2?1.f:.2f+.07f*I,.001f);Record(TEXT("normal_lighting_unchanged"),Lights);}
+        Record(TEXT("completed_drill_restores_selected_scene"),SmartLightingScene==R.Scene&&SmartFixtureOverrides.Contains(TEXT("SM_TableLamp_A1_32"))&&FMath::IsNearlyEqual(GetSmartFixtureLevel(TEXT("SM_TableLamp_A1_32")),.42f,.001f));
+        Record(TEXT("completed_drill_restores_time_mode"),Clock.bRunning==R.Flow&&(R.Flow?Clock.Hour>R.FireHour:Clock.Hour==R.FireHour));
+        Record(TEXT("completed_drill_restores_windows_and_airflow"),GetRoomOpenWindowCount(0)==GetRoomWindowCount(0)&&Ventilation->IsDisplayed());
+        {bool Lights=true;for(int32 I=0;I<CourseworkRooms::Count;++I)Lights &=RoomLightOn[I]==(I%2==0)&&FMath::IsNearlyEqual(RoomBrightness[I],I==2?1.f:.2f+.07f*I,.001f);Record(TEXT("normal_lighting_unchanged"),Lights);}
         Record(TEXT("repeat_start_pointer"),Click(400,613)&&SafetyState==1);R.Stage=5;break;
     case 5:
         if(!EvacuatingResident||ResidentRouteIndex<1)return;
         {int32 Count=0;for(TActorIterator<AActor> It(GetWorld());It;++It)if(It->ActorHasTag(TEXT("CourseworkEvacuatingResident")))++Count;Record(TEXT("repeat_has_one_resident"),Count==1);}
-        Record(TEXT("abort_midrun_restores_idle"),Click(760,613)&&SafetyState==0&&!EvacuatingResident&&!OriginalResident->IsHidden());R.Stage=6;R.StageAt=Now;break;
+        Record(TEXT("abort_midrun_restores_idle"),Click(420,613)&&SafetyState==0&&!EvacuatingResident&&!OriginalResident->IsHidden());
+        Record(TEXT("repeated_drill_restores_scene_again"),SmartLightingScene==R.Scene&&SmartFixtureOverrides.Contains(TEXT("SM_TableLamp_A1_32"))&&Ventilation->IsDisplayed());R.Stage=6;R.StageAt=Now;break;
     default:
         if(Now-R.StageAt<1)return;Finish();break;
     }

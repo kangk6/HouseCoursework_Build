@@ -231,7 +231,7 @@ void ACourseworkHUD::InitializeRoomLighting()
     UE_LOG(LogTemp,Display,TEXT("ROOM_LIGHTING lights=%d glow_parameters=%d"),ControlledLights.Num(),ControlledGlows.Num());
     bLightingReady=true;LoadRoomLighting();
     // Capture night ambient actors only after they and movable window surfaces exist.
-    if(TestMode.IsEmpty()||TestMode==TEXT("clock")||TestMode==TEXT("dial")||TestMode==TEXT("startup"))InitializeTimeOfDay();
+    if(TestMode.IsEmpty()||TestMode==TEXT("clock")||TestMode==TEXT("dial")||TestMode==TEXT("startup")||TestMode==TEXT("day_cycle")||TestMode==TEXT("drill_restore"))InitializeTimeOfDay();
 }
 bool ACourseworkHUD::IsRoomLightOn(int32 Room)const{return SmartLightingScene?GetSmartRoomLevel(Room)>.001f:RoomLightOn[CourseworkRooms::Clamp(Room)];}
 float ACourseworkHUD::GetRoomBrightness(int32 Room)const{return SmartLightingScene?GetSmartRoomLevel(Room):RoomBrightness[CourseworkRooms::Clamp(Room)];}
@@ -240,6 +240,15 @@ void ACourseworkHUD::SetRoomLighting(int32 Room,bool Enabled,float Brightness)
 {
     if(!FMath::IsFinite(Brightness))return;
     Room=CourseworkRooms::Clamp(Room);
+    if(IsSafetyDrillRunning()&&SafetySavedSmartScene&&!bApplyingLightingSave)
+    {
+        // A new room adjustment made during the exercise is still the latest
+        // user choice; resuming automation must not resurrect an older override.
+        SafetySavedManualRooms.Add(Room);
+        auto Remove=[&](FName Name){SafetySavedFixtureOverrides.Remove(Name);SafetySavedFixtureRestore.Remove(Name);};
+        for(const auto& Light:ControlledLights)if(Light.Room==Room&&Light.Component.IsValid())Remove(Light.Component->GetOwner()->GetFName());
+        for(const auto& Glow:ControlledGlows)if(Glow.Room==Room&&Glow.Mesh.IsValid())Remove(Glow.Mesh->GetOwner()->GetFName());
+    }
     if(SmartLightingScene&&!bApplyingLightingSave)
     {
         SmartManualRooms.Add(Room);

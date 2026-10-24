@@ -42,7 +42,7 @@ void ACourseworkHUD::TickDaylightAcceptance()
     case 5:Record(TEXT("evening_dial_apply"),Overlay->ExerciseTimeSelection(17)&&GetDaylightHour()==17);Record(TEXT("evening_angle_lower_than_noon"),GetDaylightElevation()<25);SetPanel(0);break;
     case 6:Shot(TEXT("Daylight_evening.png"),9);break;
     case 7:Record(TEXT("night_dial_apply"),Overlay->ExerciseTimeSelection(21)&&GetDaylightHour()==21);SetPanel(0);break;
-    case 8:Record(TEXT("night_has_no_sunlight"),Daylight->GetSunIntensity()==0);Shot(TEXT("Daylight_night.png"),9);break;
+    case 8:Record(TEXT("night_has_no_visible_sunlight"),Daylight->GetSunIntensity()<=.00002f);Shot(TEXT("Daylight_night.png"),9);break;
     case 9:Record(TEXT("dial_noon_pointer"),Overlay->ExerciseTimeSelection(12)&&FMath::IsNearlyEqual(GetDaylightHour(),12.f,.001f));Record(TEXT("slider_leaves_room_states"),LightsSame());Shot(TEXT("Daylight_panel_active.png"));break;
     case 10:CollectGarbage(RF_NoFlags);Record(TEXT("preview_survives_garbage_collection"),IsDaylightActive());Record(TEXT("dial_midnight"),Overlay->ExerciseTimeSelection(0)&&GetDaylightHour()==0);Record(TEXT("dial_last_minute"),Overlay->ExerciseTimeSelection(1439.f/60)&&FMath::IsNearlyEqual(GetDaylightHour(),1439.f/60,.001f));Record(TEXT("nan_rejected"),!SetDaylightHour(std::numeric_limits<float>::quiet_NaN())&&FMath::IsNearlyEqual(GetDaylightHour(),1439.f/60,.001f));break;
     case 11:Record(TEXT("dial_noon_reset"),Overlay->ExerciseTimeSelection(12)&&IsDaylightActive()&&GetDaylightHour()==12);Record(TEXT("noon_reset_preserves_fixed_mode"),!IsTimeFlowing());RestoreDaylight();Record(TEXT("environment_snapshot_exactly_restored"),Daylight->CheckRestored());Record(TEXT("restore_preserves_lights"),LightsSame());SetPanel(0);break;

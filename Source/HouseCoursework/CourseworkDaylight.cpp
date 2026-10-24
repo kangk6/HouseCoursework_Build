@@ -9,6 +9,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Components/LightComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "HAL/IConsoleManager.h"
 #include "CourseworkClock.h"
 
@@ -39,7 +41,7 @@ bool ACourseworkDaylight::Apply(float Value)
     if(!FMath::IsFinite(Value))return false;
     if(!bActive)
     {
-        Actors.Empty();Components.Empty();Meshes.Empty();OriginalMeshReferences.Empty();
+        Actors.Empty();Components.Empty();Meshes.Empty();OriginalMeshReferences.Empty();SkyParameters.Empty();
         for(TActorIterator<AActor> It(GetWorld());It;++It)
         {
             if(*It==this)continue;
@@ -53,7 +55,17 @@ bool ACourseworkDaylight::Apply(float Value)
             for(auto* C:Parts)
             {
                 auto* Ambient=Cast<ULightComponent>(C);
-                Components.Add({C,C->IsVisible(),Ambient?Ambient->Intensity:-1.f});
+                auto* Fog=Cast<UExponentialHeightFogComponent>(C);auto* Directional=Cast<UDirectionalLightComponent>(C);
+                Components.Add({C,C->IsVisible(),Ambient?Ambient->Intensity:-1.f,Fog?Fog->FogDensity:-1.f,Fog?Fog->SecondFogData.FogDensity:-1.f,Directional&&Directional->bAtmosphereSunLight,Fog?Fog->FogMaxOpacity:-1.f});
+                if(Directional)Directional->SetAtmosphereSunLight(false);
+                if(Class.Contains(TEXT("Sky")))if(auto* Mesh=Cast<UStaticMeshComponent>(C))for(int32 Slot=0;Slot<Mesh->GetNumMaterials();++Slot)if(auto* MID=Cast<UMaterialInstanceDynamic>(Mesh->GetMaterial(Slot)))
+                {
+                    FSkyParameters State;State.Material=MID;TArray<FMaterialParameterInfo> Infos;TArray<FGuid> IDs;MID->GetAllVectorParameterInfo(Infos,IDs);
+                    for(const auto& Info:Infos){FLinearColor Color;if(Info.Name.ToString().Contains(TEXT("color"))&&MID->GetVectorParameterValue(Info,Color))State.Colors.Add({Info.Name,Color});}
+                    Infos.Empty();IDs.Empty();MID->GetAllScalarParameterInfo(Infos,IDs);
+                    for(const auto& Info:Infos){float ParameterValue=0;if(Info.Name.ToString().Contains(TEXT("brightness"))&&MID->GetScalarParameterValue(Info,ParameterValue))State.Brightness.Add({Info.Name,ParameterValue});}
+                    SkyParameters.Add(MoveTemp(State));
+                }
                 if(!Ambient)C->SetVisibility(false,false);
             }
         }
@@ -102,10 +114,16 @@ void ACourseworkDaylight::UpdateLighting()
     const float Phase=(RenderedHour-6)/12.f;
     const float SolarElevation=65.f*FMath::Sin(Phase*PI);
     const float DayWeight=FMath::SmoothStep(0.f,12.f,SolarElevation);
+    const float NightWeight=FMath::SmoothStep(0.f,4.f,-SolarElevation);
+    Atmosphere->SetSkyLuminanceFactor(FLinearColor(DayWeight,DayWeight,DayWeight));
+    Atmosphere->SetAerialPespectiveViewDistanceScale(DayWeight);
     const float Yaw=FMath::Lerp(-90.f,90.f,Phase);
     Sun->SetWorldRotation(FRotator(-SolarElevation,Yaw,0));
     const float SunStrength=FMath::SmoothStep(0.f,8.f,SolarElevation);
-    Sun->SetIntensity(PreviewWeight*SunStrength*(4+8*FMath::Max(0.f,FMath::Sin(Phase*PI))));
+    // Zero removes a directional light from the render scene and changes the
+    // atmosphere's source selection. Keep a negligible 0.00001-unit source
+    // registered through the horizon; acceptance checks its actual raw value.
+    Sun->SetIntensity(FMath::Max(.00001f,PreviewWeight*SunStrength*(4+8*FMath::Max(0.f,FMath::Sin(Phase*PI)))));
     Sun->SetLightColor(FMath::Lerp(FLinearColor(1,.53f,.24f),FLinearColor(1,.96f,.87f),FMath::Clamp(SolarElevation/40.f,0.f,1.f)));
     Sky->SetIntensity(FMath::Lerp(.08f,.9f,DayWeight)*PreviewWeight);
     Sky->SetLightColor(FMath::Lerp(FLinearColor(.35f,.5f,1),FLinearColor(1,.98f,.93f),DayWeight));
@@ -117,29 +135,34 @@ void ACourseworkDaylight::UpdateLighting()
     for(const auto& S:Meshes)if(auto* C=S.Component.Get())if(auto* M=S.Original.Get())
     {
         UStaticMesh* Desired=M;
-        if(!OriginalNight)for(const auto& Comparison:ComparisonMeshes)if(Comparison->GetName()==M->GetName()+TEXT("_Daylight")){Desired=Comparison;break;}
+        for(const auto& Comparison:ComparisonMeshes)if(Comparison->GetName()==M->GetName()+TEXT("_Daylight")){Desired=Comparison;break;}
         if(C->GetStaticMesh()!=Desired)C->SetStaticMesh(Desired);
     }
     if(Exposure)Exposure->BlendWeight=DayBlend;
-    Sky->SetVisibility(!OriginalNight);Sun->SetVisibility(!OriginalNight);
+    for(const auto& S:SkyParameters)if(auto* M=S.Material.Get())
+    {for(const auto& P:S.Colors)M->SetVectorParameterValue(P.Key,FLinearColor(P.Value.R*NightWeight,P.Value.G*NightWeight,P.Value.B*NightWeight,P.Value.A));for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value*NightWeight);}
+    Sky->SetVisibility(true);Sun->SetVisibility(true);
     for(const auto& S:Actors)if(auto* A=S.Actor.Get())
-        A->SetActorHiddenInGame(S.Hidden||(!OriginalNight&&!A->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))));
+        A->SetActorHiddenInGame(S.Hidden||A->FindComponentByClass<USkyLightComponent>()||(!OriginalNight&&A->GetClass()->GetName().Contains(TEXT("Sky"))));
     for(const auto& S:Components)if(auto* C=S.Component.Get())
     {
+        if(Cast<USkyLightComponent>(C)){C->SetVisibility(false,false);continue;}
+        // Density alone still produces saturated fog at far sky distances.
+        // Fade the opacity limit too, so its first nonzero density cannot add
+        // a blue veil in a single frame at the horizon.
+        if(auto* Fog=Cast<UExponentialHeightFogComponent>(C)){Fog->SetFogDensity(S.FogDensity*NightWeight);Fog->SetSecondFogDensity(S.SecondFogDensity*NightWeight);Fog->SetFogMaxOpacity(S.FogMaxOpacity*NightWeight);}
         if(auto* L=Cast<ULightComponent>(C))
         {
-            if(S.AmbientIntensity>=0)L->SetIntensity(S.AmbientIntensity*(1-DayBlend));
-            C->SetVisibility(S.Visible&&(OriginalNight||C->GetOwner()->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))),false);
+            if(S.AmbientIntensity>=0)L->SetIntensity(S.AmbientIntensity*(C->GetOwner()->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))?1-DayBlend:NightWeight));
+            C->SetVisibility(S.Visible,false);
         }
-        else C->SetVisibility(S.Visible&&OriginalNight,false);
+        else C->SetVisibility(S.Visible&&(!C->GetOwner()->GetClass()->GetName().Contains(TEXT("Sky"))||OriginalNight),false);
     }
     // Re-entering daytime must follow the same ordering as first activation.
     // UE checks the render scene for static sky lights when adding atmosphere;
     // enabling it in the same frame as removing the old sky leaves a permanent
     // false "lighting needs rebuild" dependency on that static night sky.
-    if(OriginalNight)
-    {GetWorld()->GetTimerManager().ClearTimer(AtmosphereTimer);Atmosphere->SetVisibility(false);}
-    else if(!Atmosphere->IsVisible()&&!GetWorld()->GetTimerManager().IsTimerActive(AtmosphereTimer))
+    if(!Atmosphere->IsVisible()&&!GetWorld()->GetTimerManager().IsTimerActive(AtmosphereTimer))
         GetWorld()->GetTimerManager().SetTimer(AtmosphereTimer,[this](){if(bActive)Atmosphere->SetVisibility(true);},.1f,false);
 }
 void ACourseworkDaylight::Restore()
@@ -148,9 +171,10 @@ void ACourseworkDaylight::Restore()
     GetWorld()->GetTimerManager().ClearTimer(AtmosphereTimer);
     Sun->SetVisibility(false);Sun->SetIntensity(0);Atmosphere->SetVisibility(false);Sky->SetVisibility(false);
     if(Exposure){Exposure->Destroy();Exposure=nullptr;}
+    for(const auto& S:SkyParameters)if(auto* M=S.Material.Get()){for(const auto& P:S.Colors)M->SetVectorParameterValue(P.Key,P.Value);for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value);}
     for(const auto& S:Meshes)if(auto* C=S.Component.Get())if(auto* M=S.Original.Get())C->SetStaticMesh(M);
     for(const auto& State:Actors)if(auto* A=State.Actor.Get()){A->SetActorHiddenInGame(State.Hidden);A->SetActorTickEnabled(State.Tick);}
-    for(const auto& State:Components)if(auto* C=State.Component.Get()){if(State.AmbientIntensity>=0)if(auto* L=Cast<ULightComponent>(C))L->SetIntensity(State.AmbientIntensity);C->SetVisibility(State.Visible,false);}
+    for(const auto& State:Components)if(auto* C=State.Component.Get()){if(State.AmbientIntensity>=0)if(auto* L=Cast<ULightComponent>(C))L->SetIntensity(State.AmbientIntensity);if(auto* D=Cast<UDirectionalLightComponent>(C))D->SetAtmosphereSunLight(State.AtmosphereSun);if(auto* Fog=Cast<UExponentialHeightFogComponent>(C)){Fog->SetFogDensity(State.FogDensity);Fog->SetSecondFogDensity(State.SecondFogDensity);Fog->SetFogMaxOpacity(State.FogMaxOpacity);}C->SetVisibility(State.Visible,false);}
     bActive=false;SetActorTickEnabled(false);OriginalMeshReferences.Empty();
     if(bChangedSkyTimeSlice)if(auto* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.SkyLight.RealTimeReflectionCapture.TimeSlice")))if(CVar->GetInt()==0)CVar->SetWithCurrentPriority(OriginalSkyTimeSlice);
     bChangedSkyTimeSlice=false;
@@ -158,12 +182,16 @@ void ACourseworkDaylight::Restore()
 bool ACourseworkDaylight::CheckRestored()const
 {
     if(bActive||IsActorTickEnabled()||Sun->IsVisible()||Sky->IsVisible()||Atmosphere->IsVisible()||Exposure)return false;
+    for(const auto& S:SkyParameters)if(auto* M=S.Material.Get())
+    {for(const auto& P:S.Colors){FLinearColor Color;if(!M->GetVectorParameterValue(FMaterialParameterInfo(P.Key),Color)||!Color.Equals(P.Value,.000001f))return false;}for(const auto& P:S.Brightness){float Value=0;if(!M->GetScalarParameterValue(FMaterialParameterInfo(P.Key),Value)||!FMath::IsNearlyEqual(Value,P.Value,.000001f))return false;}}
     if(auto* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.SkyLight.RealTimeReflectionCapture.TimeSlice")))if(CVar->GetInt()!=OriginalSkyTimeSlice)return false;
     for(const auto& S:Meshes)if(auto* C=S.Component.Get())if(C->GetStaticMesh()!=S.Original.Get())return false;
     for(const auto& S:Actors)if(auto* A=S.Actor.Get())if(A->IsHidden()!=S.Hidden||A->IsActorTickEnabled()!=S.Tick)return false;
     for(const auto& S:Components)if(auto* C=S.Component.Get())
     {
         if(C->IsVisible()!=S.Visible)return false;
+        if(auto* D=Cast<UDirectionalLightComponent>(C))if(D->bAtmosphereSunLight!=S.AtmosphereSun)return false;
+        if(auto* Fog=Cast<UExponentialHeightFogComponent>(C))if(!FMath::IsNearlyEqual(Fog->FogDensity,S.FogDensity)||!FMath::IsNearlyEqual(Fog->SecondFogData.FogDensity,S.SecondFogDensity)||!FMath::IsNearlyEqual(Fog->FogMaxOpacity,S.FogMaxOpacity))return false;
         if(S.AmbientIntensity>=0)if(auto* L=Cast<ULightComponent>(C))if(!FMath::IsNearlyEqual(L->Intensity,S.AmbientIntensity))return false;
     }
     return true;

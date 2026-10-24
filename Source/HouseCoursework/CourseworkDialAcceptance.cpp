@@ -50,13 +50,13 @@ void ACourseworkHUD::TickDialAcceptance()
     case 5:
         Check(TEXT("dial_pointer_accepts_midnight"),Seek(0));Click(1350,750);Check(TEXT("midnight_applied"),Clock.Hour==0);SetPanel(0);break;
     case 6:
-        Check(TEXT("midnight_has_no_sun"),Daylight->GetSunIntensity()==0&&NeedsNightLighting());SetPanel(9);
+        Check(TEXT("midnight_has_no_visible_sun"),Daylight->GetSunIntensity()<=.00002f&&NeedsNightLighting());SetPanel(9);
         Check(TEXT("drag_begin"),Overlay->ExerciseControlDrag(Point(23.75f),0));
         Check(TEXT("drag_across_midnight"),Overlay->ExerciseControlDrag(Point(.25f),1));
         Check(TEXT("drag_release"),Overlay->ExerciseControlDrag(Point(.25f),2));
         Check(TEXT("drag_is_preview_only"),Clock.Hour==0);Click(1350,750);Check(TEXT("drag_applies_quarter_hour"),FMath::IsNearlyEqual(float(Clock.Hour),.25f,.001f));SetPanel(0);break;
     case 7:
-        Check(TEXT("midnight_drag_does_not_flash_day"),Daylight->GetSunIntensity()==0&&Daylight->GetRenderedHour()<.3f);SetPanel(6);break;
+        Check(TEXT("midnight_drag_does_not_flash_day"),Daylight->GetSunIntensity()<=.00002f&&Daylight->GetRenderedHour()<.3f);SetPanel(6);break;
     case 8:
         {const bool Before=IsRoomLightOn(0);Overlay->ShowLightingRoom(0);Check(TEXT("single_light_toggle"),Click(560,600)&&IsRoomLightOn(0)!=Before);Click(560,600);Check(TEXT("light_toggle_restores_state"),IsRoomLightOn(0)==Before);}
         Check(TEXT("night_card_enters_scene"),Click(1040,380)&&SmartLightingScene==1);Check(TEXT("night_card_toggles_off"),Click(1040,380)&&SmartLightingScene==0);

@@ -96,7 +96,7 @@ public:
     // Runtime-only teaching simulation. Never persisted with household settings.
     void TriggerKitchenAlarm();
     void HandleKitchenAlarm();
-    void ResetKitchenAlarm();
+    void ResetKitchenAlarm(bool ResumeEnvironment=true);
     int32 GetSafetyState() const { return SafetyState; }
     bool IsSafetyActive() const { return SafetyState>=2; }
     bool IsSafetyDrillRunning() const { return SafetyState!=0; }
@@ -150,6 +150,8 @@ private:
     void TickClockAcceptance();
     void TickDialAcceptance();
     void TickStartupAcceptance();
+    void TickDayCycleAcceptance();
+    void TickDrillRestoreAcceptance();
     FCourseworkClock Clock;
     int32 TimeEditorRevision=0;
     bool bStartupCover=false;
@@ -234,6 +236,10 @@ private:
     UPROPERTY() TObjectPtr<class USoundWaveProcedural> SafetySirenWave;
     UPROPERTY() TObjectPtr<class UAudioComponent> SafetySiren;
     int32 SafetyState=0;
+    int32 SafetySavedSmartScene=0;
+    TMap<FName,float> SafetySavedFixtureOverrides;
+    TMap<FName,float> SafetySavedFixtureRestore;
+    TSet<int32> SafetySavedManualRooms;
     UPROPERTY() TObjectPtr<class UAnimSequence> ResidentRunAnimation;
     UPROPERTY() TObjectPtr<class UAnimSequence> ResidentIdleAnimation;
     UPROPERTY() TObjectPtr<ACharacter> EvacuatingResident;
