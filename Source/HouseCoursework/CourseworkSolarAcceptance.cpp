@@ -64,8 +64,10 @@ void ACourseworkHUD::TickSolarAcceptance()
     if(Now-R.At<1.)return;R.At=Now;
     switch(R.Stage++)
     {
-    case 0:Record(TEXT("noon_roof_produces_surplus"),SolarFlow.Generation>216&&SolarFlow.Export>0&&SolarFlow.Import==0&&Balance());Shot(TEXT("Solar_roof.png"));R.Seconds=SolarMeter.Seconds;R.Energy=SolarMeter.Generation;R.Stamp=Now;break;
-    case 1:Record(TEXT("fixed_sun_keeps_meter_running_at_60x"),Close((SolarMeter.Seconds-R.Seconds)/(Now-R.Stamp),60,4)&&SolarMeter.Generation>R.Energy);SetPanel(8);Shot(TEXT("Solar_day.png"));break;
+    case 0:Record(TEXT("noon_roof_produces_surplus"),SolarFlow.Generation>216&&SolarFlow.Export>0&&SolarFlow.Import==0&&Balance());Shot(TEXT("Solar_roof.png"));R.Seconds=SolarMeter.Seconds;R.Energy=SolarMeter.Generation;R.Stamp=GetWorld()->GetTimeSeconds();break;
+    // Clock and meter both consume game DeltaSeconds. Wall time also includes
+    // asset/readback stalls that UE may clamp; it is not the integration input.
+    case 1:Record(TEXT("fixed_sun_meter_matches_game_clock_rate"),Close(SolarMeter.Seconds-R.Seconds,(GetWorld()->GetTimeSeconds()-R.Stamp)*60.,.05)&&SolarMeter.Generation>R.Energy);SetPanel(8);Shot(TEXT("Solar_day.png"));break;
     case 2:Record(TEXT("native_green_tab_and_room_selection"),Overlay->ExerciseControlPointer({570,45})&&PanelMode==8&&Overlay->ExerciseControlPointer({150,295}));Record(TEXT("obsolete_scenario_and_duration_buttons_removed"),!Overlay->ExerciseControlPointer({380,680})&&!Overlay->ExerciseControlPointer({1350,212}));R.Before=SolarMeter;Hour(0);Record(TEXT("seeking_does_not_bill_skipped_hours"),SolarMeter.Seconds==R.Before.Seconds&&SolarMeter.Generation==R.Before.Generation);break;
     case 3:Record(TEXT("midnight_grid_supplies_actual_216w_load"),SolarFlow.Generation==0&&Close(SolarFlow.Import,216)&&SolarFlow.Export==0&&Balance());Shot(TEXT("Solar_night.png"));SetAllRoomLighting(false);break;
     case 4:Record(TEXT("lights_off_stops_grid_import"),SolarFlow.Load==0&&SolarFlow.Import==0);Hour(12);break;

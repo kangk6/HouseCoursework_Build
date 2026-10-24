@@ -33,9 +33,11 @@ void ACourseworkHUD::TickDialAcceptance()
     {
     case 0:
         Check(TEXT("opening_dial_suspends_time"),Clock.Hour==R.Hour&&Clock.bRunning);
+        Check(TEXT("speed_selection_is_draft_only"),Click(360,477)&&Clock.DayMinutes==24);
         Check(TEXT("dial_pointer_accepts_dawn"),Seek(6));Check(TEXT("dial_preview_does_not_seek_scene"),Clock.Hour==R.Hour);Shot(TEXT("Dial_preview.png"));break;
     case 1:
         Check(TEXT("apply_pointer_seeks_selected_time"),Click(1350,750)&&FMath::IsNearlyEqual(float(Clock.Hour),6.f,.001f));
+        Check(TEXT("apply_commits_selected_day_duration"),Clock.DayMinutes==6);
         Check(TEXT("apply_keeps_flow_mode"),Clock.bRunning);SetPanel(0);break;
     case 2:
         Check(TEXT("clock_resumes_after_dial_close"),Clock.Hour>6);SetPanel(9);
@@ -43,8 +45,8 @@ void ACourseworkHUD::TickDialAcceptance()
         Check(TEXT("apply_commits_fixed_mode"),!Clock.bRunning&&Clock.Hour==12);R.World=GetWorld()->GetTimeSeconds();SetPanel(0);break;
     case 3:
         Check(TEXT("fixed_time_does_not_pause_world"),Clock.Hour==12&&GetWorld()->GetTimeSeconds()>R.World+1);
-        SetPanel(9);Seek(21);Click(900,750);SetPanel(0);
-        Check(TEXT("cancel_drops_time_and_mode_edits"),Clock.Hour==12&&!Clock.bRunning);SetPanel(9);break;
+        SetPanel(9);Seek(21);Click(900,750);Click(620,477);SetPanel(0);
+        Check(TEXT("cancel_drops_time_mode_and_speed_edits"),Clock.Hour==12&&!Clock.bRunning&&Clock.DayMinutes==6);SetPanel(9);break;
     case 4:
         Click(1350,750);Check(TEXT("reopen_resets_discarded_draft"),Clock.Hour==12&&!Clock.bRunning);Shot(TEXT("Dial_fixed.png"));break;
     case 5:
@@ -58,12 +60,17 @@ void ACourseworkHUD::TickDialAcceptance()
     case 7:
         Check(TEXT("midnight_drag_does_not_flash_day"),Daylight->GetSunIntensity()<=.00002f&&Daylight->GetRenderedHour()<.3f);SetPanel(6);break;
     case 8:
+    {
+        Overlay->ShowLightingRoom(0);Check(TEXT("room_reset_entry_restores_full_brightness"),Click(370,600)&&IsRoomLightOn(0)&&GetRoomBrightness(0)==1);
+        SetRoomLighting(0,R.On[0],R.Levels[0]);
+        Check(TEXT("whole_house_defaults_entry"),Click(1450,144));bool Defaults=true;for(int32 I=0;I<CourseworkRooms::Count;++I){Defaults&=IsRoomLightOn(I)&&GetRoomBrightness(I)==1;SetRoomLighting(I,R.On[I],R.Levels[I]);}Check(TEXT("whole_house_defaults_match_room_defaults"),Defaults);
         {const bool Before=IsRoomLightOn(0);Overlay->ShowLightingRoom(0);Check(TEXT("single_light_toggle"),Click(560,600)&&IsRoomLightOn(0)!=Before);Click(560,600);Check(TEXT("light_toggle_restores_state"),IsRoomLightOn(0)==Before);}
         Check(TEXT("night_card_enters_scene"),Click(1040,380)&&SmartLightingScene==1);Check(TEXT("night_card_toggles_off"),Click(1040,380)&&SmartLightingScene==0);
-        Check(TEXT("reading_card_enters_scene"),Click(1350,380)&&SmartLightingScene==2);Check(TEXT("reading_card_toggles_off"),Click(1350,380)&&SmartLightingScene==0);Shot(TEXT("Clean_smart.png"));break;
+        Check(TEXT("reading_card_enters_scene"),Click(1350,380)&&SmartLightingScene==2);Check(TEXT("reading_scene_has_explicit_exit"),Click(1430,279)&&SmartLightingScene==0);Check(TEXT("reading_card_can_reenter"),Click(1350,380)&&SmartLightingScene==2);Check(TEXT("reading_card_toggles_off"),Click(1350,380)&&SmartLightingScene==0);Shot(TEXT("Clean_smart.png"));break;
+    }
     case 9:SetPanel(8);break;
     case 10:
-        Check(TEXT("energy_eco_button"),Click(560,680)&&bEnergyComparisonActive);Check(TEXT("energy_restore_button"),Click(750,680)&&!bEnergyComparisonActive&&Same());Shot(TEXT("Clean_energy.png"));break;
+        Check(TEXT("green_page_preserves_preferences"),Same()&&!bEnergyComparisonActive);Check(TEXT("green_page_no_obsolete_scenario_buttons"),!Click(560,680)&&!Click(750,680));Check(TEXT("green_room_shortcut_opens_lighting"),Click(890,540)&&PanelMode==6);Check(TEXT("green_tab_returns_from_lighting"),Click(570,45)&&PanelMode==8);Shot(TEXT("Clean_energy.png"));break;
     case 11:SetPanel(7);break;
     case 12:Check(TEXT("single_safety_action_starts_drill"),Click(420,610)&&IsSafetyDrillRunning());break;
     case 13:
@@ -77,14 +84,20 @@ void ACourseworkHUD::TickDialAcceptance()
         Check(TEXT("single_window_button_opens"),Click(420,580)&&GetRoomOpenWindowCount(0)==GetRoomWindowCount(0));
         Check(TEXT("airflow_button"),Click(1200,580)&&IsAirflowDisplayed());Shot(TEXT("Clean_ventilation.png"));break;
     case 18:
-        Check(TEXT("same_window_button_closes"),Click(420,580)&&GetRoomOpenWindowCount(0)==0);Click(1200,580);SetPanel(4);Shot(TEXT("Clean_settings.png"));break;
+    {
+        Check(TEXT("explicit_window_close_button"),Click(680,580)&&GetRoomOpenWindowCount(0)==0);Click(420,580);
+        Check(TEXT("whole_house_close_windows_entry"),Click(1400,144));bool Closed=true;for(int32 I=0;I<CourseworkRooms::Count;++I)Closed&=GetRoomOpenWindowCount(I)==0;Check(TEXT("whole_house_close_windows_effect"),Closed);
+        Check(TEXT("window_observation_has_navigation_or_blocked_feedback"),Click(400,710)&&(PanelMode==0||ToastUntil>Now));SetPanel(9);SelectComfortPage(1);Click(1200,580);SetPanel(4);Click(600,353);Click(500,524);
+        Check(TEXT("settings_defaults_entry"),Click(390,666)&&Sensitivity==1&&SpeedScale==1);Shot(TEXT("Clean_settings.png"));break;
+    }
     case 19:
+        Check(TEXT("settings_help_entry"),Click(600,666)&&PanelMode==3);
         SetPanel(9);SelectComfortPage(0);TriggerKitchenAlarm();R.Hour=Clock.Hour;break;
     case 20:
         Seek(12);Click(900,750);Click(1350,750);Check(TEXT("fire_blocks_dial_apply"),Clock.Hour==R.Hour&&!Clock.bRunning);
         ResetKitchenAlarm();SetPanel(0);SetPanel(9);break;
     case 21:
-        Seek(12);Click(900,750);Click(1350,750);Check(TEXT("flow_checkbox_can_resume"),Clock.bRunning&&Clock.Hour==12);Shot(TEXT("Dial_final.png"));break;
+        Seek(12);Click(900,750);Click(485,477);Click(1350,750);Check(TEXT("flow_checkbox_can_resume"),Clock.bRunning&&Clock.Hour==12&&Clock.DayMinutes==24);Shot(TEXT("Dial_final.png"));break;
     default:
         Check(TEXT("original_lighting_preferences_preserved"),Same());
         FFileHelper::SaveStringToFile(TEXT("{\"checks\":[")+FString::Join(TestResults,TEXT(","))+TEXT("]}"),*(FPaths::ProjectSavedDir()/TEXT("DialAcceptance.json")));

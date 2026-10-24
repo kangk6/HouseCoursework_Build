@@ -240,9 +240,9 @@ void UCourseworkOverlay::RefreshPanel()
     }
     else if (Mode == 3)
     {
-        PanelTitle->SetText(FText::FromString(TEXT("开始参观")));
+        PanelTitle->SetText(FText::FromString(TEXT("操作帮助")));
         PanelBody->SetText(FText::FromString(TEXT("WASD 移动    鼠标观察\nE 操作物件    按住 E 滚轮调光\nM 地图    Tab 控制面板    Esc 暂停")));
-        AddButton(TEXT("开始参观"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, ClosePanel));
+        AddButton(TEXT("返回住宅"), GET_FUNCTION_NAME_CHECKED(UCourseworkOverlay, ClosePanel));
     }
     else if (Mode == 4)
     {
