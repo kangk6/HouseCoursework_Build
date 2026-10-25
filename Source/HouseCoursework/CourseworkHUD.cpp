@@ -1,4 +1,5 @@
 #include "CourseworkHUD.h"
+#include "CourseworkVisibility.h"
 #include "CourseworkOverlay.h"
 #include "CourseworkDaylight.h"
 #include "CourseworkVentilation.h"
@@ -272,6 +273,8 @@ void ACourseworkHUD::UpdateInteraction()
     const bool HitPrecise=GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Rotation.Vector()*350.f,ECC_Visibility,Params);
     auto SetHit=[&](const FHitResult& Selected)->bool
     {
+        if(!Selected.GetActor())return false;
+        if(!LightFixtureRooms.Contains(Selected.GetComponent())&&CourseworkVisibility::IsOpaqueViewBlocked(GetWorld(),PC->GetPawn(),Selected.GetActor(),Start,Selected.ImpactPoint))return false;
         if(SetWindowTarget(Selected))return true;
         if(SetApplianceTarget(Selected))return true;
         if(SetLightTarget(Selected))return true;
@@ -415,7 +418,7 @@ void ACourseworkHUD::Interact()
 {
     if (PanelMode != 0 || GetWorld()->GetRealTimeSeconds() < NextInteractionTime) return;
     UpdateInteraction();
-    if(TargetAppliance!=INDEX_NONE){ToggleAppliance(TargetAppliance);NextInteractionTime=GetWorld()->GetRealTimeSeconds()+.25;UpdateInteraction();return;}
+    if(TargetAppliance!=INDEX_NONE){if(IsSafetyDrillRunning()){ShowToast(TEXT("演练期间请优先疏散"));return;}ToggleAppliance(TargetAppliance);NextInteractionTime=GetWorld()->GetRealTimeSeconds()+.25;UpdateInteraction();return;}
     if(TargetWindow!=INDEX_NONE&&Ventilation)
     {
         if(IsSafetyDrillRunning()){ShowToast(TEXT("演练期间请优先疏散"));return;}
@@ -500,6 +503,7 @@ void ACourseworkHUD::TickAcceptanceTest()
     if(TestMode==TEXT("energy")){TickEnergyAcceptance();return;}
     if(TestMode==TEXT("solar")){TickSolarAcceptance();return;}
     if(TestMode==TEXT("household_weather")){TickHouseholdAcceptance();return;}
+    if(TestMode==TEXT("interaction")){TickInteractionAcceptance();return;}
     if(TestMode==TEXT("fixture")) {TickFixtureAcceptance();return;}
     if(TestMode.StartsWith(TEXT("evacuation"))||TestMode==TEXT("safety")||TestMode==TEXT("safety_perf")) { TickEvacuationAcceptance(); return; }
     if(TestMode==TEXT("lighting")) { TickLightingAcceptance(); return; }

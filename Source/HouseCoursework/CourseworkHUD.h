@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "CoreMinimal.h"
 #include "CourseworkRooms.h"
 #include "CourseworkClock.h"
@@ -173,6 +173,7 @@ private:
     void TickEnergyAcceptance();
     void TickSolarAcceptance();
     void TickHouseholdAcceptance();
+    void TickInteractionAcceptance();
     void InitializeHousehold();
     void TickHousehold(float DeltaSeconds);
     void RestoreHousehold();

@@ -1,7 +1,7 @@
 ﻿param(
     [string]$GameRoot='D:\HouseCoursework_Team\Artifacts\ClockFoundation\Windows',
     [string]$EvidenceRoot='D:\HouseCoursework_Team\Saved\Acceptance\ClockFoundation',
-    [ValidateSet('household_weather','clock','daylight','environment_regression','smart_lighting','ventilation','energy','solar','ui_transitions','daylight_sweep','dial','startup','day_cycle','drill_restore','evacuation','evacuation_upper')][string]$Mode='clock',
+    [ValidateSet('interaction','fixture','household_weather','clock','daylight','environment_regression','smart_lighting','ventilation','energy','solar','ui_transitions','daylight_sweep','dial','startup','day_cycle','drill_restore','evacuation','evacuation_upper')][string]$Mode='clock',
     [int]$Height=720,
     [string[]]$ExtraArguments=@()
 )
@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Force -Path $EvidenceRoot | Out-Null
 $saved=Join-Path $GameRoot 'HouseCoursework\Saved'
 $names=@{dial='DialAcceptance.json';startup='StartupAcceptance.json';clock='ClockAcceptance.json';daylight='DaylightAcceptance.json';environment_regression='EnvironmentRegression.json';smart_lighting='SmartLightingAcceptance.json';ventilation='VentilationAcceptance.json';energy='EnergyAcceptance.json';ui_transitions='TransitionAcceptance.json';daylight_sweep='DaylightSweep.json'}
 $names.day_cycle='DayCycleAcceptance.json';$names.drill_restore='DrillRestoreAcceptance.json';$names.evacuation='EvacuationAcceptance.json';$names.evacuation_upper='EvacuationAcceptance.json'
-$names.solar='SolarAcceptance.json';$names.household_weather='HouseholdWeatherAcceptance.json'
+$names.interaction='InteractionAcceptance.json';$names.fixture='FixtureAcceptance.json';$names.solar='SolarAcceptance.json';$names.household_weather='HouseholdWeatherAcceptance.json'
 $normal='D:\HouseCoursework_Build\Windows\HouseCoursework\Saved\Lighting\room_lighting.json'
 $before=if(Test-Path -LiteralPath $normal){(Get-FileHash -LiteralPath $normal).Hash}else{'missing'}
 $started=Get-Date

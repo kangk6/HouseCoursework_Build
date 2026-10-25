@@ -30,6 +30,8 @@ public:
     bool ExerciseEnergyMapButton();
     bool ExerciseMapDestination(int32 Destination);
     bool CheckLightFeedback(int32 Room,bool Dimming)const;
+    bool CheckInteractionFeedback(const FString& Name,const FString& Action)const;
+    bool HasToastMessage(const FString& Message)const;
 protected:
     virtual void NativeOnInitialized() override;
     virtual void NativeConstruct() override;

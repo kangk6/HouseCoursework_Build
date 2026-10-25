@@ -1,4 +1,5 @@
 #include "CourseworkHUD.h"
+#include "CourseworkVisibility.h"
 #include "CourseworkOverlay.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -9,30 +10,6 @@
 #include "GameFramework/PlayerController.h"
 #include "UnrealClient.h"
 
-namespace
-{
-bool LampViewBlocked(UWorld* World,AActor* Pawn,AActor* Lamp,const FVector& Eye,const FVector& Point)
-{
-    // Authored thin architectural surfaces have one-sided collision. Check
-    // both directions so the back of an opaque wall also occludes a lamp.
-    FCollisionObjectQueryParams Objects(FCollisionObjectQueryParams::AllObjects);
-    FCollisionQueryParams Query(SCENE_QUERY_STAT(LampOpaqueOcclusion),true,Pawn);Query.AddIgnoredActor(Lamp);Query.bReturnFaceIndex=true;
-    for(bool Reverse:{false,true})
-    {
-        TArray<FHitResult> Surfaces;
-        World->LineTraceMultiByObjectType(Surfaces,Reverse?Point:Eye,Reverse?Eye:Point,Objects,Query);
-        for(const auto& Surface:Surfaces)
-        {
-            auto* Mesh=Cast<UStaticMeshComponent>(Surface.GetComponent());
-            if(!Mesh||!Mesh->IsVisible()||Mesh->bHiddenInGame||FVector::Dist(Surface.ImpactPoint,Eye)<1.f||FVector::Dist(Surface.ImpactPoint,Point)<1.f)continue;
-            int32 Section=0;const auto* Material=Mesh->GetMaterialFromCollisionFaceIndex(Surface.FaceIndex,Section);
-            if(Material&&(Material->GetBlendMode()==BLEND_Translucent||Material->GetBlendMode()==BLEND_Additive||Material->GetBlendMode()==BLEND_Modulate))continue;
-            return true;
-        }
-    }
-    return false;
-}
-}
 
 void ACourseworkHUD::RegisterLightFixture(UStaticMeshComponent* Mesh,int32 Room)
 {
@@ -57,7 +34,7 @@ bool ACourseworkHUD::SetLightTarget(const FHitResult& Hit)
     const FVector Point=Hit.ImpactPoint+(TargetLightFixture->Bounds.Origin-Hit.ImpactPoint).GetSafeNormal()*2.f;
     FVector Eye;FRotator View;GetOwningPlayerController()->GetPlayerViewPoint(Eye,View);
     FHitResult Visible;FCollisionQueryParams Query(SCENE_QUERY_STAT(SelectedLampOcclusion),true,GetOwningPlayerController()->GetPawn());
-    if(!GetWorld()->LineTraceSingleByChannel(Visible,Eye,Point,ECC_Visibility,Query)||Visible.GetActor()!=Hit.GetActor()||LampViewBlocked(GetWorld(),GetOwningPlayerController()->GetPawn(),Hit.GetActor(),Eye,Point)){TargetLightFixture.Reset();return false;}
+    if(!GetWorld()->LineTraceSingleByChannel(Visible,Eye,Point,ECC_Visibility,Query)||Visible.GetActor()!=Hit.GetActor()||CourseworkVisibility::IsOpaqueViewBlocked(GetWorld(),GetOwningPlayerController()->GetPawn(),Hit.GetActor(),Eye,Point)){TargetLightFixture.Reset();return false;}
     TargetLightAimPoint=TargetLightFixture->GetComponentTransform().InverseTransformPosition(Point);
     TargetLightRoom=*Room;TargetActor=Hit.GetActor();TargetLabel=FString::Printf(TEXT("%s照明"),CourseworkRooms::Get(*Room).Name);
     RefreshLightInteraction();return true;
@@ -95,7 +72,7 @@ bool ACourseworkHUD::IsHeldLightValid()const
     FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(HeldLampOcclusion),true,PC->GetPawn());
     const FVector Point=Fixture->GetComponentTransform().TransformPosition(HeldLightAimPoint);
     return GetWorld()->LineTraceSingleByChannel(Hit,Eye,Point,ECC_Visibility,Query)&&Hit.GetActor()==Fixture->GetOwner()
-        &&!LampViewBlocked(GetWorld(),PC->GetPawn(),Fixture->GetOwner(),Eye,Point);
+        &&!CourseworkVisibility::IsOpaqueViewBlocked(GetWorld(),PC->GetPawn(),Fixture->GetOwner(),Eye,Point);
 }
 void ACourseworkHUD::TickLightInteraction()
 {

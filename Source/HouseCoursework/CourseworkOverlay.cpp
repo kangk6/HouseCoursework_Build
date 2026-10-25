@@ -398,3 +398,8 @@ bool UCourseworkOverlay::ExerciseMapDestination(int32 Destination){return Expand
 bool UCourseworkOverlay::ExerciseEnergyMapButton(){return ExpandedMap&&ExpandedMap->ExerciseLayerButton();}
 
 bool UCourseworkOverlay::ExerciseControlDrag(FVector2D Position,int32 Phase){return ControlMenu&&ControlMenu->ExerciseDrag(Position,Phase);}
+
+bool UCourseworkOverlay::CheckInteractionFeedback(const FString& Name,const FString& Action)const
+{return bInteractionWanted&&InteractionName&&Interaction&&InteractionName->GetText().ToString()==Name&&Interaction->GetText().ToString()==Action;}
+bool UCourseworkOverlay::HasToastMessage(const FString& Message)const
+{return Toast&&Toast->GetText().ToString()==Message;}
