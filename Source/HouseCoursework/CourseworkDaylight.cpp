@@ -231,3 +231,6 @@ void ACourseworkDaylight::EndPlay(const EEndPlayReason::Type Reason){Restore();S
 
 float ACourseworkDaylight::GetSkyIntensity()const{return Sky->Intensity;}
 bool ACourseworkDaylight::UsesRealtimeSky()const{return Sky->IsRealTimeCaptureEnabled();}
+
+float ACourseworkDaylight::GetRenderedElevation()const
+{const float Height=float(-GetSunRotation().Vector().Z);return FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(Height,0.f,1.f)));}

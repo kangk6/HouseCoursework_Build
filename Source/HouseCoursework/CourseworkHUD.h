@@ -174,6 +174,7 @@ private:
     void TickSolarAcceptance();
     void TickHouseholdAcceptance();
     void TickInteractionAcceptance();
+    void TickLinkageAcceptance();
     void InitializeHousehold();
     void TickHousehold(float DeltaSeconds);
     void RestoreHousehold();

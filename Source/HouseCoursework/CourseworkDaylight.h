@@ -17,6 +17,7 @@ public:
     bool IsActive()const{return bActive;}
     float GetHour()const{return Hour;}
     float GetElevation()const{return Elevation;}
+    float GetRenderedElevation()const;
     bool CheckRestored()const;
     float GetSunIntensity()const;
     float GetSkyIntensity()const;

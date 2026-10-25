@@ -1,4 +1,5 @@
 #include "CourseworkHUD.h"
+#include "CourseworkDaylight.h"
 #include "CourseworkOverlay.h"
 #include "Components/LightComponent.h"
 #include "Components/PointLightComponent.h"
@@ -229,7 +230,8 @@ void ACourseworkHUD::TickSmartLighting(float Dt)
         bSmartReadingOccupied=Now<SmartReadingUntil;
     }
     // Daylight supplement is a teaching estimate, not a lux sensor reading.
-    const float Sun=IsDaylightActive()?FMath::Clamp(GetDaylightElevation()/50.f,0.f,1.f)*GetWeatherDaylight():0.f;
+    // Follow the visible sun while a clock seek is still blending the sky.
+    const float Sun=IsDaylightActive()?FMath::Clamp(Daylight->GetRenderedElevation()/50.f,0.f,1.f)*GetWeatherDaylight():0.f;
     const float ReadingLevel=FMath::Lerp(.85f,.30f,Sun);
     for(auto& Pair:SmartFixtures)
     {

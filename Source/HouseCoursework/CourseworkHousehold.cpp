@@ -16,9 +16,9 @@ void ACourseworkHUD::InitializeHousehold()
     if(Appliances.Num())return;
     int32 Seed=int32(FPlatformTime::Cycles());FParse::Value(FCommandLine::Get(),TEXT("HouseWeatherSeed="),Seed);
     // Legacy checks isolate their original clear-sky / lighting-only conditions.
-    const bool Normal=TestMode.IsEmpty()||TestMode==TEXT("household_weather");
+    const bool Normal=TestMode.IsEmpty()||(TestMode==TEXT("household_weather")||TestMode==TEXT("linkage"));
     Weather.Initialize(Seed,Normal);
-    if(TestMode==TEXT("household_weather")&&!IsDaylightActive())InitializeTimeOfDay();
+    if((TestMode==TEXT("household_weather")||TestMode==TEXT("linkage"))&&!IsDaylightActive())InitializeTimeOfDay();
     const struct FSpec{const TCHAR* Actor;const TCHAR* Name;int32 Room;float Watts;bool Fridge;} Specs[]={
         {TEXT("SM_Monitor_A1_22"),TEXT("书房电脑"),4,180,false},
         {TEXT("SM_TV_A3"),TEXT("客厅电视"),0,90,false},

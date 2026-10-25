@@ -503,6 +503,7 @@ void ACourseworkHUD::TickAcceptanceTest()
     if(TestMode==TEXT("energy")){TickEnergyAcceptance();return;}
     if(TestMode==TEXT("solar")){TickSolarAcceptance();return;}
     if(TestMode==TEXT("household_weather")){TickHouseholdAcceptance();return;}
+    if(TestMode==TEXT("linkage")){TickLinkageAcceptance();return;}
     if(TestMode==TEXT("interaction")){TickInteractionAcceptance();return;}
     if(TestMode==TEXT("fixture")) {TickFixtureAcceptance();return;}
     if(TestMode.StartsWith(TEXT("evacuation"))||TestMode==TEXT("safety")||TestMode==TEXT("safety_perf")) { TickEvacuationAcceptance(); return; }

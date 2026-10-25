@@ -66,7 +66,7 @@ void ACourseworkHUD::RestoreDaylight(){Clock.bRunning=false;if(Daylight)Daylight
 bool ACourseworkHUD::IsDaylightActive()const{return Daylight&&Daylight->IsActive();}
 float ACourseworkHUD::GetDaylightHour()const{return float(Clock.Hour);}
 float ACourseworkHUD::GetDaylightElevation()const{return Daylight?Daylight->GetElevation():0.f;}
-bool ACourseworkHUD::NeedsNightLighting()const{return !IsDaylightActive()||GetDaylightElevation()<6.f;}
+bool ACourseworkHUD::NeedsNightLighting()const{return !IsDaylightActive()||Daylight->GetRenderedElevation()<6.f;}
 void ACourseworkHUD::ObserveDaylight()
 {
     if(IsSafetyDrillRunning()){ShowToast(TEXT("演练期间请步行疏散"));return;}

@@ -231,7 +231,7 @@ void ACourseworkHUD::InitializeRoomLighting()
     UE_LOG(LogTemp,Display,TEXT("ROOM_LIGHTING lights=%d glow_parameters=%d"),ControlledLights.Num(),ControlledGlows.Num());
     bLightingReady=true;LoadRoomLighting();
     // Capture night ambient actors only after they and movable window surfaces exist.
-    if(TestMode.IsEmpty()||TestMode==TEXT("clock")||TestMode==TEXT("dial")||TestMode==TEXT("startup")||TestMode==TEXT("day_cycle")||TestMode==TEXT("drill_restore")||TestMode==TEXT("solar")||TestMode==TEXT("energy")||TestMode==TEXT("household_weather"))InitializeTimeOfDay();
+    if(TestMode.IsEmpty()||TestMode==TEXT("clock")||TestMode==TEXT("dial")||TestMode==TEXT("startup")||TestMode==TEXT("day_cycle")||TestMode==TEXT("drill_restore")||TestMode==TEXT("solar")||TestMode==TEXT("energy")||(TestMode==TEXT("household_weather")||TestMode==TEXT("linkage")))InitializeTimeOfDay();
     InitializeSolar();
     InitializeHousehold();
 }
