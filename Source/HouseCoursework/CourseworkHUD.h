@@ -175,6 +175,7 @@ private:
     void TickHouseholdAcceptance();
     void TickInteractionAcceptance();
     void TickLinkageAcceptance();
+    void TickRainAcceptance();
     void InitializeHousehold();
     void TickHousehold(float DeltaSeconds);
     void RestoreHousehold();
@@ -186,6 +187,7 @@ private:
     int32 TargetAppliance=INDEX_NONE,EnergyPage=0;
     double ApplianceSeconds=0;
     FCourseworkWeather Weather;
+    UPROPERTY() TObjectPtr<class ACourseworkRain> RainEffect;
     void InitializeSolar();
     void TickSolar(float DeltaSeconds);
     FCourseworkSolarFlow SolarFlow;

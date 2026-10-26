@@ -104,7 +104,7 @@ public:
         }
         if(Mode==9){Add(48,195,246,242,640);Add(48,247,246,294,641);Add(48,299,246,346,642);}
         if(Mode==9&&Owner->GetComfortPage()==1){for(int32 I=0;I<CourseworkRooms::Count;++I)Add(52,360+46*I,246,404+46*I,110+CourseworkRooms::DisplayOrder[I]);if(!Owner->IsSafetyDrillRunning()){Add(1050,552,1380,608,652);Add(1300,119,1516,169,653);if(Owner->GetRoomWindowCount(Room)>0){Add(300,552,550,608,650);Add(566,552,816,608,651);Add(300,686,550,738,654);}}}
-        if(Mode==9&&Owner->GetComfortPage()==2&&!Owner->IsSafetyDrillRunning()){Add(1300,119,1516,169,860);for(int32 I=0;I<3;++I)Add(300+260*I,560,540+260*I,632,861+I);}
+        if(Mode==9&&Owner->GetComfortPage()==2&&!Owner->IsSafetyDrillRunning()){Add(1300,119,1516,169,860);for(int32 I=0;I<4;++I)Add(300+260*I,560,540+260*I,632,861+I);}
         if(Mode==9&&Owner->GetComfortPage()==0){SyncTimeDraft();Add(780,725,1070,777,624);Add(1250,725,1460,777,626);for(int32 I=0;I<3;++I)Add(300+128*I,453,420+128*I,501,630+I);if(!Owner->IsSafetyDrillRunning())Add(300,680,550,732,621);}
         if(Mode==1) for(int32 I=0;I<6;++I) Add(300,288+I*64,682,347+I*64,300+I);
         if(Mode==4){Add(296,325,690,395,220);Add(296,496,690,566,221);Add(300,640,480,692,216);Add(520,640,730,692,305);}
@@ -150,7 +150,7 @@ public:
         else if(A==520||A==521)Owner->SelectEnergyPage(A-520);
         else if(A>=800&&A<820)Owner->ToggleAppliance(A-800);
         else if(A==860)Owner->ToggleAutomaticWeather();
-        else if(A>=861&&A<=863)Owner->ChooseWeather(A-861);
+        else if(A>=861&&A<=864)Owner->ChooseWeather(A-861);
         else if(A==500||A==501)Owner->ApplyEnergyScenario(A==501);
         else if(A==502)Owner->RestoreEnergyComparison();
         else if(A==503)Owner->OpenEnergyMap();
@@ -506,8 +506,8 @@ public:
             Rect(1300,119,216,50,!Locked&&(Auto||Hover==860)?Gold:Muted);CenterText(FSlateRect(1300,119,1516,169),Auto?TEXT("自动变化  ✓"):TEXT("自动变化"),17,Locked?Muted:Auto?Gold:Ivory);
             Text(300,338,Owner->GetWeatherName(),34,Ivory,true);
             if(Owner->GetWeatherTransition()<1){Box(300,469,520,3,Muted);Box(300,469,520*Owner->GetWeatherTransition(),3,Gold);}
-            const TCHAR* Names[]={TEXT("晴"),TEXT("多云"),TEXT("阴天")};
-            for(int32 I=0;I<3;++I){const float X=300+260.f*I;const bool Selected=Owner->GetWeatherKind()==I;Rect(X,560,240,72,!Locked&&(Selected||Hover==861+I)?Gold:Muted);if(Selected)Box(X+1,561,238,70,FLinearColor(Gold.R,Gold.G,Gold.B,.08f));CenterText(FSlateRect(X,560,X+240,632),Names[I],22,Locked?Muted:Ivory);}
+            const TCHAR* Names[]={TEXT("晴"),TEXT("多云"),TEXT("阴天"),TEXT("雨天")};
+            for(int32 I=0;I<4;++I){const float X=300+260.f*I;const bool Selected=Owner->GetWeatherKind()==I;Rect(X,560,240,72,!Locked&&(Selected||Hover==861+I)?Gold:Muted);if(Selected)Box(X+1,561,238,70,FLinearColor(Gold.R,Gold.G,Gold.B,.08f));CenterText(FSlateRect(X,560,X+240,632),Names[I],22,Locked?Muted:Ivory);}
             if(Locked)Text(300,700,TEXT("演练中"),17,Gold);else if(Auto&&!Owner->IsTimeFlowing())Text(300,700,TEXT("自动天气随时间固定"),17,Muted);
             const float Cloud=Owner->GetWeatherCloudCover();
             auto Circle=[&](FVector2D C,float R,FLinearColor Color){TArray<FVector2D> P;for(int32 I=0;I<=48;++I){const float A=I*2*PI/48;P.Add(C+FVector2D(FMath::Cos(A),FMath::Sin(A))*R);}Line(P,Color,2);};
@@ -519,6 +519,7 @@ public:
                 Curve({1185,425},{1140,425},{1140,361},{1190,361});Curve({1190,361},{1192,283},{1308,283},{1308,365});Curve({1308,365},{1370,348},{1384,425},{1325,425});Line(P,Muted,2);Line({{1325,425},{1185,425}},Muted,2);
             }
             else for(int32 I=0;I<8;++I){const float A=I*PI/4;const FVector2D D(FMath::Cos(A),FMath::Sin(A));Line({FVector2D(1225,340)+D*66,FVector2D(1225,340)+D*79},Gold,2);}
+            if(Owner->GetWeatherKind()==3)for(int32 I=0;I<5;++I){const float X=1195+I*30;Line({{X,445},{X-8,464}},Muted,2);}
         }
         else if(Mode==9)
         {

@@ -1,5 +1,6 @@
 #include "CourseworkHUD.h"
 #include "CourseworkDaylight.h"
+#include "CourseworkRain.h"
 #include "CourseworkOverlay.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/BoxComponent.h"
@@ -108,7 +109,7 @@ bool ACourseworkHUD::SetApplianceTarget(const FHitResult& Hit)
     if(Overlay)Overlay->SetInteraction(TargetLabel+TEXT("  ·  按 E ")+(IsApplianceOn(*I)?TEXT("关闭"):TEXT("开启")));
     return true;
 }
-FString ACourseworkHUD::GetWeatherName()const{const TCHAR* Names[]={TEXT("晴"),TEXT("多云"),TEXT("阴天")};return Names[FMath::Clamp(Weather.Kind,0,2)];}
+FString ACourseworkHUD::GetWeatherName()const{const TCHAR* Names[]={TEXT("晴"),TEXT("多云"),TEXT("阴天"),TEXT("雨天")};return Names[FMath::Clamp(Weather.Kind,0,3)];}
 void ACourseworkHUD::ChooseWeather(int32 Kind){if(IsSafetyDrillRunning())return;Weather.Choose(Kind);UE_LOG(LogTemp,Display,TEXT("WEATHER_MANUAL kind=%d seed=%d"),Weather.Kind,Weather.Seed);}
 void ACourseworkHUD::ToggleAutomaticWeather(){if(IsSafetyDrillRunning())return;Weather.SetAutomatic(!Weather.Automatic);UE_LOG(LogTemp,Display,TEXT("WEATHER_AUTO enabled=%d seed=%d"),Weather.Automatic,Weather.Seed);}
 void ACourseworkHUD::TickHousehold(float Dt)
@@ -118,10 +119,13 @@ void ACourseworkHUD::TickHousehold(float Dt)
     Weather.Advance(Dt,SimSeconds,Clock.bRunning,Suspended);
     if(Before!=Weather.Kind)UE_LOG(LogTemp,Display,TEXT("WEATHER_AUTOMATIC from=%d to=%d seed=%d hold=%.0f"),Before,Weather.Kind,Weather.Seed,Weather.Hold);
     if(Daylight)Daylight->SetWeather(Weather.Cover,Weather.Direct(),Weather.Diffuse(),Weather.Daylight());
+    if(!RainEffect&&Weather.Rain>.001f)RainEffect=GetWorld()->SpawnActor<ACourseworkRain>();
+    if(RainEffect)RainEffect->Update(Weather.Rain,Dt);
     if(!IsEnergySuspended()&&Dt>0)ApplianceSeconds+=SimSeconds;
     for(auto& D:Appliances)if(auto* M=D.Screen.Get()){M->SetScalarParameterValue(TEXT("EmmisivePower"),D.On?.8f:0.f);M->SetScalarParameterValue(TEXT("Brightness"),D.On?1.f:0.f);}
 }
 void ACourseworkHUD::RestoreHousehold()
 {
+    if(RainEffect){RainEffect->Destroy();RainEffect=nullptr;}
     for(auto& D:Appliances){if(auto* S=D.Overlay.Get())S->DestroyComponent();else if(auto* M=D.Mesh.Get())if(D.Original.IsValid()&&D.Slot>=0)M->SetMaterial(D.Slot,D.Original.Get());}
 }
