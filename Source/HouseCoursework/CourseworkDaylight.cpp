@@ -76,10 +76,18 @@ bool ACourseworkDaylight::Apply(float Value)
         {TArray<UStaticMeshComponent*> Parts;It->GetComponents(Parts);for(auto* C:Parts)if(C->Mobility!=EComponentMobility::Static)if(UStaticMesh* Original=C->GetStaticMesh())
         {for(const auto& Comparison:ComparisonMeshes)if(Comparison->GetName()==Original->GetName()+TEXT("_Daylight"))
         {if(C->SetStaticMesh(Comparison)){Meshes.Add({C,Original});OriginalMeshReferences.Emplace(Original);}break;}}}
+        // Keep the authored night metering envelope through the daytime blend.
+        // Fixing day exposure at 1 while night adapts down to .15 made the same
+        // electric lights much darker as soon as daytime weather lost direct sun.
+        float ExposureMin=.15f,ExposureMax=5.f,ExposureBias=0,Priority=-FLT_MAX;
+        EAutoExposureMethod ExposureMethod=AEM_Histogram;
+        for(TActorIterator<APostProcessVolume> It(GetWorld());It;++It)if(It->bUnbound&&It->BlendWeight>0&&It->Priority>Priority)
+        {Priority=It->Priority;ExposureMin=It->Settings.AutoExposureMinBrightness;ExposureMax=It->Settings.AutoExposureMaxBrightness;ExposureBias=It->Settings.AutoExposureBias;ExposureMethod=It->Settings.AutoExposureMethod;}
         Exposure=GetWorld()->SpawnActor<APostProcessVolume>();Exposure->bUnbound=true;Exposure->Priority=100;Exposure->BlendWeight=0;
         auto& P=Exposure->Settings;P.bOverride_AutoExposureMinBrightness=true;P.bOverride_AutoExposureMaxBrightness=true;
-        P.AutoExposureMinBrightness=1;P.AutoExposureMaxBrightness=1;
-        P.bOverride_AutoExposureBias=true;P.AutoExposureBias=0;
+        P.AutoExposureMinBrightness=ExposureMin;P.AutoExposureMaxBrightness=ExposureMax;
+        P.bOverride_AutoExposureBias=true;P.AutoExposureBias=ExposureBias;
+        P.bOverride_AutoExposureMethod=true;P.AutoExposureMethod=ExposureMethod;
         // Let the movable sky replace the legacy static sky before enabling
         // atmosphere; no baked atmosphere dependency is introduced.
         // A 64px sky-only GPU capture is cheap enough to update every frame.
@@ -128,7 +136,9 @@ void ACourseworkDaylight::UpdateLighting()
     // registered through the horizon; acceptance checks its actual raw value.
     Sun->SetIntensity(FMath::Max(.00001f,PreviewWeight*SunStrength*(4+8*FMath::Max(0.f,FMath::Sin(Phase*PI)))*WeatherDirect));
     Sun->SetLightColor(FMath::Lerp(FLinearColor(1,.53f,.24f),FLinearColor(1,.96f,.87f),FMath::Clamp(SolarElevation/40.f,0.f,1.f)));
-    Sky->SetIntensity(FMath::Lerp(.08f,.9f*FMath::Lerp(1.f,.78f,(WeatherCover-.1f)/.82f),DayWeight)*PreviewWeight);
+    // Cloud cover reduces the direct beam, but the diffuse sky remains an
+    // independent source. Do not attenuate it a second time with cloud amount.
+    Sky->SetIntensity(FMath::Lerp(.08f,.9f*WeatherDiffuse,DayWeight)*PreviewWeight);
     Sky->SetLightColor(FMath::Lerp(FLinearColor(.35f,.5f,1),FLinearColor(1,.98f,.93f),DayWeight));
     // Night uses the authored night exposure, sky and fill lights. Previously
     // selecting 21:00 removed those fills and forced daylight exposure to zero,
@@ -178,7 +188,13 @@ void ACourseworkDaylight::UpdateLighting()
         if(auto* Fog=Cast<UExponentialHeightFogComponent>(C)){Fog->SetFogDensity(S.FogDensity*NightWeight);Fog->SetSecondFogDensity(S.SecondFogDensity*NightWeight);Fog->SetFogMaxOpacity(S.FogMaxOpacity*NightWeight);}
         if(auto* L=Cast<ULightComponent>(C))
         {
-            if(S.AmbientIntensity>=0)L->SetIntensity(S.AmbientIntensity*(C->GetOwner()->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))?1-DayBlend:NightWeight));
+            // The two existing low-level interior bounce proxies must not vanish
+            // by day while remaining free ambient light at night. Scale their
+            // daytime contribution by diffuse weather, without adding fixtures.
+            // The captured daytime sky supplies part of the bounce already;
+            // keep this legacy proxy below its authored night contribution.
+            const float BounceWeight=1-DayBlend+DayBlend*.8f*WeatherDiffuse;
+            if(S.AmbientIntensity>=0)L->SetIntensity(S.AmbientIntensity*(C->GetOwner()->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))?BounceWeight:NightWeight));
             C->SetVisibility(S.Visible,false);
         }
         else C->SetVisibility(S.Visible&&(!C->GetOwner()->GetClass()->GetName().Contains(TEXT("Sky"))||OriginalNight||WeatherSkies.Num()>0),false);

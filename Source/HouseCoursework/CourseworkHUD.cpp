@@ -503,7 +503,7 @@ void ACourseworkHUD::TickAcceptanceTest()
     if(TestMode==TEXT("energy")){TickEnergyAcceptance();return;}
     if(TestMode==TEXT("solar")){TickSolarAcceptance();return;}
     if(TestMode==TEXT("household_weather")){TickHouseholdAcceptance();return;}
-    if(TestMode==TEXT("rain")){TickRainAcceptance();return;}
+    if(TestMode==TEXT("rain")||TestMode==TEXT("rain_brightness")){TickRainAcceptance();return;}
     if(TestMode==TEXT("linkage")){TickLinkageAcceptance();return;}
     if(TestMode==TEXT("interaction")){TickInteractionAcceptance();return;}
     if(TestMode==TEXT("fixture")) {TickFixtureAcceptance();return;}

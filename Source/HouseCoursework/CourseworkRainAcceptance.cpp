@@ -10,10 +10,57 @@
 #include "Misc/FileHelper.h"
 #include "UnrealClient.h"
 #include "TimerManager.h"
+#include "Engine/GameViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
+#include "ImageUtils.h"
+#include "Engine/PostProcessVolume.h"
+#include "EngineUtils.h"
 
 void ACourseworkHUD::TickRainAcceptance()
 {
     if(!bLightingReady)return;
+    if(TestMode==TEXT("rain_brightness"))
+    {
+        struct FSurvey{int32 Index=0;double At=0;bool AllPixels=true;TArray<FString> Samples;TArray<double> Luma,Dark,Bright;};static FSurvey S;
+        const double Now=GetWorld()->GetRealTimeSeconds();auto* PC=GetOwningPlayerController();
+        auto Setup=[&]()
+        {
+            const int32 Room=S.Index/3,Scene=S.Index%3;const auto& P=CourseworkRooms::Get(Room);
+            auto* C=Cast<ACharacter>(PC->GetPawn());C->GetCharacterMovement()->DisableMovement();C->SetActorEnableCollision(false);C->SetActorLocation(P.Position);PC->SetControlRotation((P.Focus-C->GetPawnViewLocation()).Rotation());PC->PlayerCameraManager->UpdateCamera(0);
+            SetDaylightHour(Scene==2?0:12);Daylight->Snap(Scene==2?0:12);Weather.Initialize(2471,false);Weather.Choose(Scene==0?0:3);Weather.Advance(10,0,false,false);TickHousehold(0);S.At=Now;
+        };
+        if(TestCase<0)
+        {
+            TestCase=0;S=FSurvey();SetPanel(0);InitializeTimeOfDay();SetTimeFlowing(false);SetSmartLightingScene(0);SetAllRoomLighting(true);
+            for(int32 I=0;I<Appliances.Num();++I)if(Appliances[I].On)ToggleAppliance(I);
+            for(TActorIterator<APostProcessVolume> It(GetWorld());It;++It)UE_LOG(LogTemp,Display,TEXT("RAIN_EXPOSURE actor=%s priority=%.2f weight=%.2f min=%.3f max=%.3f bias=%.3f method=%d"),*It->GetName(),It->Priority,It->BlendWeight,It->Settings.AutoExposureMinBrightness,It->Settings.AutoExposureMaxBrightness,It->Settings.AutoExposureBias,int32(It->Settings.AutoExposureMethod));
+            Setup();return;
+        }
+        if(Now-S.At<3)return;
+        TArray<FColor> Pixels;FIntVector Size=FIntVector::ZeroValue;auto Window=GetWorld()->GetGameViewport()->GetWindow();
+        double Luma=0,Dark=0,Bright=0;int32 Count=0;
+        if(Window.IsValid()&&FSlateApplication::Get().TakeScreenshot(Window.ToSharedRef(),Pixels,Size)&&Pixels.Num())
+        {
+            for(int32 Y=Size.Y*45/100;Y<Size.Y*80/100;Y+=2)for(int32 X=Size.X/5;X<Size.X*4/5;X+=2){const auto& P=Pixels[Y*Size.X+X];const double L=.2126*P.R+.7152*P.G+.0722*P.B;Luma+=L;Dark+=L<8?1:0;Bright+=L>250?1:0;++Count;}
+            TArray64<uint8> PNG;FImageUtils::PNGCompressImageArray(Size.X,Size.Y,Pixels,PNG);FFileHelper::SaveArrayToFile(PNG,*(FPaths::ProjectSavedDir()/FString::Printf(TEXT("RainBrightness_%02d.png"),S.Index)));
+        }
+        S.AllPixels&=Count>1000;S.Luma.Add(Luma/FMath::Max(1,Count));S.Dark.Add(Dark/FMath::Max(1,Count));S.Bright.Add(Bright/FMath::Max(1,Count));
+        const FString Sample=FString::Printf(TEXT("{\"room\":%d,\"scene\":%d,\"luma\":%.5f,\"dark_fraction\":%.5f,\"bright_fraction\":%.5f,\"sun\":%.5f,\"sky\":%.5f,\"pixels\":%d}"),S.Index/3,S.Index%3,S.Luma.Last(),S.Dark.Last(),S.Bright.Last(),Daylight->GetSunIntensity(),Daylight->GetSkyIntensity(),Count);
+        S.Samples.Add(Sample);UE_LOG(LogTemp,Display,TEXT("RAIN_BRIGHTNESS %s"),*Sample);
+        if(++S.Index<27){Setup();return;}
+        auto Check=[&](FString Name,bool Good){TestResults.Add(FString::Printf(TEXT("{\"case\":\"%s\",\"passed\":%s}"),*Name,Good?TEXT("true"):TEXT("false")));};
+        Check(TEXT("all_27_rendered_views_sampled"),S.AllPixels&&S.Samples.Num()==27);
+        for(int32 Room=0;Room<9;++Room)
+        {
+            const int32 I=Room*3;const FString Prefix=FString::Printf(TEXT("room_%d_"),Room);
+            Check(Prefix+TEXT("noon_rain_not_darker_than_night"),S.Luma[I+1]>=S.Luma[I+2]*.98);
+            Check(Prefix+TEXT("rain_retains_clear_day_contrast"),S.Luma[I+1]<=S.Luma[I]+2);
+            Check(Prefix+TEXT("rain_interior_not_crushed"),S.Luma[I+1]>20&&S.Dark[I+1]<.25);
+            Check(Prefix+TEXT("rain_interior_not_whitewashed"),S.Luma[I+1]<200&&S.Bright[I+1]<.20);
+        }
+        FFileHelper::SaveStringToFile(TEXT("{\"checks\":[")+FString::Join(TestResults,TEXT(","))+TEXT("],\"samples\":[")+FString::Join(S.Samples,TEXT(","))+TEXT("]}"),*(FPaths::ProjectSavedDir()/TEXT("RainBrightness.json")));TestMode.Empty();QuitApplication();return;
+    }
     struct FRun{int32 Stage=0;double At=0,Started=0,OvercastPV=0,Motion=0,Hour=0,Energy=0;float Rain=0,OutsideGain=0;int32 Seed=0;};static FRun R;
     const double Now=GetWorld()->GetRealTimeSeconds();auto* PC=GetOwningPlayerController();
     auto Check=[&](FString Name,bool Good){TestResults.Add(FString::Printf(TEXT("{\"case\":\"%s\",\"passed\":%s}"),*Name,Good?TEXT("true"):TEXT("false")));UE_LOG(LogTemp,Display,TEXT("RAIN_CHECK %s"),*TestResults.Last());};
