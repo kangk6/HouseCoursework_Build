@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "v0.17.1-base",
+  "version": "v0.22.0-rain-polish",
   "files": [
     {
       "path": "Content/BlankDefault/Levels/Blank_Empty.umap",
@@ -145,6 +145,24 @@
       "size": 57671,
       "sha256": "befe09a620adcf07811120e81fbb8f61c01316c569a3d3b0cdf2cf1b7f4a14bf",
       "pack": "assets-v0.17.1-base-coursework.zip"
+    },
+    {
+      "path": "Content/Coursework/RainPolish/M_RainSplash.uasset",
+      "size": 6942,
+      "sha256": "1105ad9c499cfc0543b301a100f6bf1f998119f359ebc5dc65f3b9631e673245",
+      "pack": "assets-v0.22.0-rain-polish-delta.zip"
+    },
+    {
+      "path": "Content/Coursework/RainPolish/M_RainStreak.uasset",
+      "size": 6998,
+      "sha256": "154ec23a6cd0b5657979c1259152d14ff0eb1ef526db1e7b9bf4b837ae212bf9",
+      "pack": "assets-v0.22.0-rain-polish-delta.zip"
+    },
+    {
+      "path": "Content/Coursework/RainPolish/M_RoadWet.uasset",
+      "size": 12227,
+      "sha256": "8285b47438da9f897999124b8d6c89e4e7103360c543db21b9172497e4a58bd7",
+      "pack": "assets-v0.22.0-rain-polish-delta.zip"
     },
     {
       "path": "Content/Coursework/ResidentAnimated/Accessory_detail.uasset",
@@ -14531,6 +14549,11 @@
       "name": "assets-v0.17.1-base-starter.zip",
       "size": 625167746,
       "sha256": "6b7d8832ba9bd7a741adafd8b23e0bd247407b31e6399d9ed60fb7d89fb789e6"
+    },
+    {
+      "name": "assets-v0.22.0-rain-polish-delta.zip",
+      "size": 10760,
+      "sha256": "bea2bf87174dc4b7b166ecb5c7eae8e0271984513389202989d721bc022c5ac0"
     }
   ]
 }

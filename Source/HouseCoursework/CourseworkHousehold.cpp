@@ -120,7 +120,7 @@ void ACourseworkHUD::TickHousehold(float Dt)
     if(Before!=Weather.Kind)UE_LOG(LogTemp,Display,TEXT("WEATHER_AUTOMATIC from=%d to=%d seed=%d hold=%.0f"),Before,Weather.Kind,Weather.Seed,Weather.Hold);
     if(Daylight)Daylight->SetWeather(Weather.Cover,Weather.Direct(),Weather.Diffuse(),Weather.Daylight());
     if(!RainEffect&&Weather.Rain>.001f)RainEffect=GetWorld()->SpawnActor<ACourseworkRain>();
-    if(RainEffect)RainEffect->Update(Weather.Rain,Dt);
+    if(RainEffect)RainEffect->Update(Weather.Rain,Dt,Daylight&&Daylight->IsActive()?FMath::SmoothStep(0.f,15.f,Daylight->GetRenderedElevation()):0.f);
     if(!IsEnergySuspended()&&Dt>0)ApplianceSeconds+=SimSeconds;
     for(auto& D:Appliances)if(auto* M=D.Screen.Get()){M->SetScalarParameterValue(TEXT("EmmisivePower"),D.On?.8f:0.f);M->SetScalarParameterValue(TEXT("Brightness"),D.On?1.f:0.f);}
 }

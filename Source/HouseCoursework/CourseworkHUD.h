@@ -176,6 +176,7 @@ private:
     void TickInteractionAcceptance();
     void TickLinkageAcceptance();
     void TickRainAcceptance();
+    void TickRainPolishAcceptance();
     void InitializeHousehold();
     void TickHousehold(float DeltaSeconds);
     void RestoreHousehold();
