@@ -12,6 +12,12 @@
 #include "TimerManager.h"
 #include "Misc/CommandLine.h"
 #include "Engine/StaticMesh.h"
+#include "CourseworkDaylight.h"
+#include "Engine/GameViewportClient.h"
+#include "EngineGlobals.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
+#include "HAL/PlatformApplicationMisc.h"
 
 static FVector AcceptanceAimPoint(UStaticMeshComponent* C,const FVector& Eye,float Height,float Side=0.f)
 {
@@ -66,6 +72,39 @@ void ACourseworkHUD::TickComprehensiveAcceptance()
     auto* PC=GetOwningPlayerController();
     auto* Character=Cast<ACharacter>(PC->GetPawn());
     const double Now=GetWorld()->GetRealTimeSeconds();
+    // Opt-in audit conditions. Legacy furniture checks keep their original
+    // environment; normal gameplay never enters this acceptance function.
+    struct FRouteAudit
+    {
+        FString Scenario;bool Configured=false,Started=false;double At=0,WallFrame=0,GpuTotal=0;
+        int32 ForegroundFrames=0;FIntPoint Size=FIntPoint::ZeroValue;TArray<FString> FrameRows;
+    };static FRouteAudit Audit;
+    FParse::Value(FCommandLine::Get(),TEXT("HouseRouteScenario="),Audit.Scenario);
+    const bool Audited=TestMode==TEXT("route")&&!Audit.Scenario.IsEmpty();
+    if(Audited)
+    {
+        if(!bLightingReady)return;
+        if(!Audit.Configured)
+        {
+            if(Audit.Scenario!=TEXT("day")&&Audit.Scenario!=TEXT("rain")&&Audit.Scenario!=TEXT("night")&&Audit.Scenario!=TEXT("fire"))
+            {UE_LOG(LogTemp,Error,TEXT("Unknown route audit scenario: %s"),*Audit.Scenario);QuitApplication();return;}
+            // Legacy screenshot flags may have armed a smart scene already.
+            // Establish the daily baseline first, otherwise SetAllRoomLighting
+            // manually takes over every room and silently disables path fills.
+            SetSmartLightingScene(0);
+            InitializeTimeOfDay();SetTimeFlowing(false);SetDaylightHour(Audit.Scenario==TEXT("night")?0:12);
+            Daylight->Snap(Audit.Scenario==TEXT("night")?0:12);Weather.Initialize(2471,false);
+            Weather.Choose(Audit.Scenario==TEXT("rain")?3:0);Weather.Advance(10,0,false,false);
+            SetAllRoomLighting(true);if(Audit.Scenario==TEXT("night"))SetSmartLightingScene(1);
+            SetPanel(0);Audit.At=Now;Audit.Configured=true;Audit.FrameRows.Add(TEXT("frame_ms,gpu_ms,stop"));return;
+        }
+        if(Now-Audit.At<15)return;
+        if(!Audit.Started)
+        {
+            Audit.Started=true;if(Audit.Scenario==TEXT("fire"))TriggerKitchenAlarm();
+            UE_LOG(LogTemp,Display,TEXT("ROUTE_AUDIT_BEGIN scenario=%s warmup=15 screenshots=%d offscreen=%d"),*Audit.Scenario,!FParse::Param(FCommandLine::Get(),TEXT("HouseNoRouteScreenshots")),FParse::Param(FCommandLine::Get(),TEXT("RenderOffscreen")));
+        }
+    }
     if(bAcceptanceKeyDown && Now>=AcceptanceKeyReleaseAt) { PC->InputKey(FInputKeyParams(EKeys::E,IE_Released,0.0)); bAcceptanceKeyDown=false; }
     if(TestCase<0)
     {
@@ -211,11 +250,21 @@ void ACourseworkHUD::TickComprehensiveAcceptance()
         {TEXT("entry_return"),FVector(-2205,9170,150)},
         {TEXT("outside_return"),FVector(-2205,8700,70)}
     };
-    if(Now>AcceptanceLastFrame)
+    const double WallNow=FPlatformTime::Seconds();
+    if(Now>AcceptanceLastFrame&&(!Audited||Audit.WallFrame>0))
     {
-        const float FrameMs=(Now-AcceptanceLastFrame)*1000.f;AcceptanceFrameTimes.Add(FrameMs);
+        const float FrameMs=Audited?float((WallNow-Audit.WallFrame)*1000.):float((Now-AcceptanceLastFrame)*1000.f);AcceptanceFrameTimes.Add(FrameMs);
+        if(Audited)
+        {
+            const double GpuMs=FPlatformTime::ToMilliseconds(GGPUFrameTime);Audit.GpuTotal+=GpuMs;
+            auto* Viewport=GetWorld()->GetGameViewport();auto Window=Viewport->GetWindow();
+            Audit.Size=Viewport->Viewport->GetSizeXY();
+            if(Window.IsValid()&&Window->IsActive()&&!Window->IsWindowMinimized()&&FPlatformApplicationMisc::IsThisApplicationForeground())++Audit.ForegroundFrames;
+            Audit.FrameRows.Add(FString::Printf(TEXT("%.4f,%.4f,%s"),FrameMs,GpuMs,Stops[FMath::Clamp(TestCase,0,int32(UE_ARRAY_COUNT(Stops))-1)].Name));
+        }
         if(FrameMs>100.f)UE_LOG(LogTemp,Display,TEXT("ROUTE_LONG_FRAME stop=%s frame_ms=%.3f"),Stops[FMath::Clamp(TestCase,0,int32(UE_ARRAY_COUNT(Stops))-1)].Name,FrameMs);
     }
+    if(Audited)Audit.WallFrame=WallNow;
     AcceptanceLastFrame=Now;
     if(!AcceptancePendingShot.IsEmpty())
     {
@@ -282,7 +331,21 @@ void ACourseworkHUD::TickComprehensiveAcceptance()
             int32 LongFrames=0;TArray<FString> FrameRows;FrameRows.Add(TEXT("frame_ms"));
             for(float V:AcceptanceFrameTimes){if(V>100.f)++LongFrames;FrameRows.Add(FString::Printf(TEXT("%.3f"),V));}
             FFileHelper::SaveStringToFile(FString::Join(FrameRows,TEXT("\n")),*(FPaths::ProjectSavedDir()/TEXT("RouteFrameTimes.csv")));
-            const FString Report=FString::Printf(TEXT("{\"completed\":%s,\"mid_route_teleports\":0,\"screenshots\":%s,\"frames\":%d,\"average_fps\":%.3f,\"max_frame_ms\":%.3f,\"p95_ms\":%.3f,\"p99_ms\":%.3f,\"frames_over_100ms\":%d,\"stops\":[%s]}"),Reached?TEXT("true"):TEXT("false"),FParse::Param(FCommandLine::Get(),TEXT("HouseNoRouteScreenshots"))?TEXT("false"):TEXT("true"),AcceptanceFrameTimes.Num(),1000.f*AcceptanceFrameTimes.Num()/FMath::Max(Total,1.f),Max,P95,P99,LongFrames,*FString::Join(TestResults,TEXT(",")));
+            FString AuditFields;
+            if(Audited)
+            {
+                FFileHelper::SaveStringToFile(FString::Join(Audit.FrameRows,TEXT("\n")),*(FPaths::ProjectSavedDir()/TEXT("RouteAuditFrameTimes.csv")));
+                const bool Offscreen=FParse::Param(FCommandLine::Get(),TEXT("RenderOffscreen"));
+                const bool Screenshots=!FParse::Param(FCommandLine::Get(),TEXT("HouseNoRouteScreenshots"));
+                const bool Eligible=!Offscreen&&!Screenshots&&Audit.ForegroundFrames==AcceptanceFrameTimes.Num()&&AcceptanceFrameTimes.Num()>500;
+                AuditFields=FString::Printf(TEXT(",\"scenario\":\"%s\",\"warmup_seconds\":15,\"offscreen\":%s,\"foreground_frames\":%d,\"benchmark_eligible\":%s,\"resolution\":[%d,%d],\"gpu_mean_ms\":%.4f"),*Audit.Scenario,Offscreen?TEXT("true"):TEXT("false"),Audit.ForegroundFrames,Eligible?TEXT("true"):TEXT("false"),Audit.Size.X,Audit.Size.Y,Audit.GpuTotal/FMath::Max(1,AcceptanceFrameTimes.Num()));
+                bool Conditions=FMath::IsNearlyEqual(GetDaylightHour(),Audit.Scenario==TEXT("night")?0.f:12.f,.01f)&&!Clock.bRunning;
+                if(Audit.Scenario==TEXT("rain"))Conditions&=Weather.Rain>.99f;
+                if(Audit.Scenario==TEXT("night"))Conditions&=SmartLightingScene==1&&SmartManualRooms.Num()==0&&NeedsNightLighting();
+                if(Audit.Scenario==TEXT("fire"))Conditions&=IsSafetyDrillRunning()&&HasResidentGathered();
+                AuditFields+=FString::Printf(TEXT(",\"scenario_valid\":%s,\"smart_scene\":%d,\"manual_rooms\":%d"),Conditions?TEXT("true"):TEXT("false"),SmartLightingScene,SmartManualRooms.Num());
+            }
+            const FString Report=FString::Printf(TEXT("{\"completed\":%s,\"mid_route_teleports\":0,\"screenshots\":%s,\"frames\":%d,\"average_fps\":%.3f,\"max_frame_ms\":%.3f,\"p95_ms\":%.3f,\"p99_ms\":%.3f,\"frames_over_100ms\":%d%s,\"stops\":[%s]}"),Reached?TEXT("true"):TEXT("false"),FParse::Param(FCommandLine::Get(),TEXT("HouseNoRouteScreenshots"))?TEXT("false"):TEXT("true"),AcceptanceFrameTimes.Num(),1000.f*AcceptanceFrameTimes.Num()/FMath::Max(Total,1.f),Max,P95,P99,LongFrames,*AuditFields,*FString::Join(TestResults,TEXT(",")));
             FFileHelper::SaveStringToFile(Report,*(FPaths::ProjectSavedDir()/TEXT("ContinuousRouteAcceptance.json")));
             TestMode.Empty();
             if(!Reached)
