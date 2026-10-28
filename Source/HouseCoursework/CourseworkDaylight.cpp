@@ -4,7 +4,7 @@
 #include "Components/SkyAtmosphereComponent.h"
 #include "Engine/PostProcessVolume.h"
 #include "EngineUtils.h"
-#include "TimerManager.h"
+#include "EngineGlobals.h"
 #include "Engine/StaticMesh.h"
 #include "Components/StaticMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -90,13 +90,17 @@ bool ACourseworkDaylight::Apply(float Value)
         P.bOverride_AutoExposureMethod=true;P.AutoExposureMethod=ExposureMethod;
         // Lens effects must not depend on the daylight/exposure blend: otherwise
         // the legacy night volume reintroduces colored flare ghosts at sunset.
-        // Override only these three presentation properties; metering and every
-        // physical light/material remain under their existing controls.
+        // Keep lens presentation and neutral white balance independent of time.
+        // The authored night grade (4757K + reduced red) cooled even noon rooms.
+        // Neutral grading preserves warm bulbs and naturally cool outdoor sky.
         LensEffects=GetWorld()->SpawnActor<APostProcessVolume>();LensEffects->bUnbound=true;LensEffects->Priority=200;LensEffects->BlendWeight=0;
         auto& Lens=LensEffects->Settings;
         Lens.bOverride_LensFlareIntensity=true;Lens.LensFlareIntensity=0;
         Lens.bOverride_BloomIntensity=true;Lens.BloomIntensity=.45f;
         Lens.bOverride_BloomThreshold=true;Lens.BloomThreshold=1.f;
+        Lens.bOverride_WhiteTemp=true;Lens.WhiteTemp=6500.f;
+        Lens.bOverride_WhiteTint=true;Lens.WhiteTint=0;
+        Lens.bOverride_SceneColorTint=true;Lens.SceneColorTint=FLinearColor::White;
         // Let the movable sky replace the legacy static sky before enabling
         // atmosphere; no baked atmosphere dependency is introduced.
         // A 64px sky-only GPU capture is cheap enough to update every frame.
@@ -104,6 +108,7 @@ bool ACourseworkDaylight::Apply(float Value)
         if(auto* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.SkyLight.RealTimeReflectionCapture.TimeSlice")))
         {OriginalSkyTimeSlice=CVar->GetInt();bChangedSkyTimeSlice=OriginalSkyTimeSlice!=0;if(bChangedSkyTimeSlice)CVar->SetWithCurrentPriority(0);}
         bActive=true;RenderedHour=float(FCourseworkClock::Wrap(Value));PreviewWeight=0;
+        AtmosphereFenceFrame=GFrameCounter+1;bAtmosphereFenceStarted=false;
         Sky->SetVisibility(true);Sun->SetVisibility(true);SetActorTickEnabled(true);
     }
     Hour=float(FCourseworkClock::Wrap(Value));
@@ -214,17 +219,20 @@ void ACourseworkDaylight::UpdateLighting()
         }
         else C->SetVisibility(S.Visible&&(!C->GetOwner()->GetClass()->GetName().Contains(TEXT("Sky"))||OriginalNight||WeatherSkies.Num()>0),false);
     }
-    // Re-entering daytime must follow the same ordering as first activation.
-    // UE checks the render scene for static sky lights when adding atmosphere;
-    // enabling it in the same frame as removing the old sky leaves a permanent
-    // false "lighting needs rebuild" dependency on that static night sky.
-    if(!Atmosphere->IsVisible()&&!GetWorld()->GetTimerManager().IsTimerActive(AtmosphereTimer))
-        GetWorld()->GetTimerManager().SetTimer(AtmosphereTimer,[this](){if(bActive)Atmosphere->SetVisibility(true);},.1f,false);
+    // Component visibility updates are sent at the end of the activation frame.
+    // A .1-second timer can expire in that same frame under a low frame rate.
+    // Fence on the following frame, then enable atmosphere only after the old
+    // static sky has actually left the render scene. No blocking GPU flush.
+    if(!Atmosphere->IsVisible()&&GFrameCounter>=AtmosphereFenceFrame)
+    {
+        if(!bAtmosphereFenceStarted){AtmosphereReadyFence.BeginFence();bAtmosphereFenceStarted=true;}
+        if(AtmosphereReadyFence.IsFenceComplete())Atmosphere->SetVisibility(true);
+    }
 }
 void ACourseworkDaylight::Restore()
 {
     if(!bActive)return;
-    GetWorld()->GetTimerManager().ClearTimer(AtmosphereTimer);
+    bAtmosphereFenceStarted=false;AtmosphereFenceFrame=0;
     Sun->SetVisibility(false);Sun->SetIntensity(0);Atmosphere->SetVisibility(false);Sky->SetVisibility(false);
     if(Exposure){Exposure->Destroy();Exposure=nullptr;}
     if(LensEffects){LensEffects->Destroy();LensEffects=nullptr;}

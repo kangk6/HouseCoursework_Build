@@ -16,28 +16,45 @@
 #include "ImageUtils.h"
 #include "Engine/PostProcessVolume.h"
 #include "EngineUtils.h"
+#include "Components/LightComponent.h"
 
 void ACourseworkHUD::TickRainAcceptance()
 {
     if(!bLightingReady)return;
     if(TestMode==TEXT("rain_brightness"))
     {
-        struct FSurvey{int32 Index=0;double At=0;bool AllPixels=true;TArray<FString> Samples;TArray<double> Luma,Dark,Bright;};static FSurvey S;
+        struct FSurvey{int32 Index=0,Frames=0;double At=0;bool AllPixels=true,NeutralGrade=true,LightingBuilt=true;TArray<FString> Samples;TArray<double> Luma,Dark,Bright;};static FSurvey S;
         const double Now=GetWorld()->GetRealTimeSeconds();auto* PC=GetOwningPlayerController();
         auto Setup=[&]()
         {
             const int32 Room=S.Index/3,Scene=S.Index%3;const auto& P=CourseworkRooms::Get(Room);
             auto* C=Cast<ACharacter>(PC->GetPawn());C->GetCharacterMovement()->DisableMovement();C->SetActorEnableCollision(false);C->SetActorLocation(P.Position);PC->SetControlRotation((P.Focus-C->GetPawnViewLocation()).Rotation());PC->PlayerCameraManager->UpdateCamera(0);
-            SetDaylightHour(Scene==2?0:12);Daylight->Snap(Scene==2?0:12);Weather.Initialize(2471,false);Weather.Choose(Scene==0?0:3);Weather.Advance(10,0,false,false);TickHousehold(0);S.At=Now;
+            SetDaylightHour(Scene==2?0:12);Daylight->Snap(Scene==2?0:12);Weather.Initialize(2471,false);Weather.Choose(Scene==0?0:3);Weather.Advance(10,0,false,false);TickHousehold(0);S.At=Now;S.Frames=0;
         };
         if(TestCase<0)
         {
             TestCase=0;S=FSurvey();SetPanel(0);InitializeTimeOfDay();SetTimeFlowing(false);SetSmartLightingScene(0);SetAllRoomLighting(true);
             for(int32 I=0;I<Appliances.Num();++I)if(Appliances[I].On)ToggleAppliance(I);
+            bool Temperatures=true;int32 Warm=0;TArray<FString> Sources;
+            for(const auto& Source:ControlledLights)if(auto* L=Source.Component.Get())
+            {
+                Temperatures&=!L->bUseTemperature||L->Temperature<=6500.f;
+                Warm+=L->bUseTemperature&&L->Temperature<4000.f?1:0;
+                Sources.Add(FString::Printf(TEXT("{\"actor\":\"%s\",\"component\":\"%s\",\"temperature_enabled\":%s,\"kelvin\":%.3f,\"intensity\":%.5f}"),*L->GetOwner()->GetName(),*L->GetName(),L->bUseTemperature?TEXT("true"):TEXT("false"),L->Temperature,L->Intensity));
+            }
+            TestResults.Add(FString::Printf(TEXT("{\"case\":\"indoor_fills_not_excessively_cool_and_warm_fixtures_retained\",\"passed\":%s}"),Temperatures&&Warm>0?TEXT("true"):TEXT("false")));
+            FFileHelper::SaveStringToFile(TEXT("[")+FString::Join(Sources,TEXT(","))+TEXT("]"),*(FPaths::ProjectSavedDir()/TEXT("InteriorLightingSources.json")));
             for(TActorIterator<APostProcessVolume> It(GetWorld());It;++It)UE_LOG(LogTemp,Display,TEXT("RAIN_EXPOSURE actor=%s priority=%.2f weight=%.2f min=%.3f max=%.3f bias=%.3f method=%d"),*It->GetName(),It->Priority,It->BlendWeight,It->Settings.AutoExposureMinBrightness,It->Settings.AutoExposureMaxBrightness,It->Settings.AutoExposureBias,int32(It->Settings.AutoExposureMethod));
             Setup();return;
         }
-        if(Now-S.At<3)return;
+        // Initial loading and temporal exposure need rendered frames as well as
+        // wall time, especially in an offscreen/background run on battery.
+        if(++S.Frames<24||Now-S.At<(S.Index==0?12.:3.))return;
+        if(GetWorld()->NumLightingUnbuiltObjects>0){S.LightingBuilt=false;PC->ConsoleCommand(TEXT("DumpUnbuiltLightInteractions"),true);}
+        const APostProcessVolume* Grade=nullptr;
+        for(TActorIterator<APostProcessVolume> It(GetWorld());It;++It)
+            if(It->bUnbound&&It->BlendWeight>.99f&&It->Settings.bOverride_WhiteTemp&&(!Grade||It->Priority>Grade->Priority))Grade=*It;
+        S.NeutralGrade&=Grade&&FMath::IsNearlyEqual(Grade->Settings.WhiteTemp,6500.f)&&Grade->Settings.bOverride_WhiteTint&&Grade->Settings.WhiteTint==0&&Grade->Settings.bOverride_SceneColorTint&&Grade->Settings.SceneColorTint.Equals(FLinearColor::White);
         TArray<FColor> Pixels;FIntVector Size=FIntVector::ZeroValue;auto Window=GetWorld()->GetGameViewport()->GetWindow();
         double Luma=0,Dark=0,Bright=0;int32 Count=0;
         if(Window.IsValid()&&FSlateApplication::Get().TakeScreenshot(Window.ToSharedRef(),Pixels,Size)&&Pixels.Num())
@@ -51,6 +68,8 @@ void ACourseworkHUD::TickRainAcceptance()
         if(++S.Index<27){Setup();return;}
         auto Check=[&](FString Name,bool Good){TestResults.Add(FString::Printf(TEXT("{\"case\":\"%s\",\"passed\":%s}"),*Name,Good?TEXT("true"):TEXT("false")));};
         Check(TEXT("all_27_rendered_views_sampled"),S.AllPixels&&S.Samples.Num()==27);
+        Check(TEXT("neutral_white_balance_in_all_27_views"),S.NeutralGrade);
+        Check(TEXT("no_unbuilt_lighting_in_all_27_views"),S.LightingBuilt);
         for(int32 Room=0;Room<9;++Room)
         {
             const int32 I=Room*3;const FString Prefix=FString::Printf(TEXT("room_%d_"),Room);

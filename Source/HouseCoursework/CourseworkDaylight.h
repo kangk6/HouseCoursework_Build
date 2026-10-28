@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "UObject/StrongObjectPtr.h"
+#include "RenderCommandFence.h"
 #include "CourseworkDaylight.generated.h"
 
 // Renders the shared 24-hour clock; household lighting is untouched.
@@ -52,6 +53,8 @@ private:
     float RenderedHour=12,PreviewWeight=0;
     int32 OriginalSkyTimeSlice=1;
     bool bChangedSkyTimeSlice=false;
-    FTimerHandle AtmosphereTimer;
+    FRenderCommandFence AtmosphereReadyFence;
+    uint64 AtmosphereFenceFrame=0;
+    bool bAtmosphereFenceStarted=false;
     void UpdateLighting();
 };

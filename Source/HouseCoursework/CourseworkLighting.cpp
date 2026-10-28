@@ -41,7 +41,7 @@ void ACourseworkHUD::InitializeRoomLighting()
         FActorSpawnParameters Params;Params.Name=FName(*FString::Printf(TEXT("CourseworkNightAmbient_%d"),Room));
         auto* Actor=GetWorld()->SpawnActor<APointLight>(AmbientPositions[Room],FRotator::ZeroRotator,Params);
         auto* Ambient=Actor->PointLightComponent.Get();Ambient->SetMobility(EComponentMobility::Movable);
-        Ambient->IntensityUnits=ELightUnits::Candelas;Ambient->SetIntensity(Room==0?.3f:.35f);Ambient->SetAttenuationRadius(650);Ambient->SetCastShadows(false);Ambient->SetLightColor(FLinearColor(.5f,.6f,.8f));
+        Ambient->IntensityUnits=ELightUnits::Candelas;Ambient->SetIntensity(Room==0?.3f:.35f);Ambient->SetAttenuationRadius(650);Ambient->SetCastShadows(false);Ambient->SetLightColor(FLinearColor(.58f,.6f,.64f));
     }
     // Reuse the authored floor-lamp mesh and materials for a visible living fixture.
     for(TActorIterator<AActor> Source(GetWorld());Source;++Source) if(Source->GetName()==TEXT("SM_Lamp_A1_23"))
@@ -168,8 +168,12 @@ void ACourseworkHUD::InitializeRoomLighting()
             TArray<ULightComponent*> Lights;It->GetComponents(Lights);
             for(auto* Light:Lights)
             {
-                ControlledLights.Add({Light,Light->Intensity,Room});
                 Light->SetMobility(EComponentMobility::Movable);
+                // Normalize only the excessively cool authored indoor fills.
+                // Keep warm fixtures, lumen ratings, coverage and smart dimming.
+                if(Light->bUseTemperature&&Light->Temperature>6500.f)
+                    Light->SetTemperature(Room==2||Room==4?4500.f:4000.f);
+                ControlledLights.Add({Light,Light->Intensity,Room});
                 // Authored baked scenes use many overlapping fill lights. Keep
                 // dynamic shadows on the key fixtures instead of rendering the
                 // whole house repeatedly for every fill component.
