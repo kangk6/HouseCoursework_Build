@@ -82,12 +82,13 @@ bool ACourseworkDaylight::Apply(float Value)
         float ExposureMin=.15f,ExposureMax=5.f,ExposureBias=0,Priority=-FLT_MAX;
         EAutoExposureMethod ExposureMethod=AEM_Histogram;
         for(TActorIterator<APostProcessVolume> It(GetWorld());It;++It)if(It->bUnbound&&It->BlendWeight>0&&It->Priority>Priority)
-        {Priority=It->Priority;ExposureMin=It->Settings.AutoExposureMinBrightness;ExposureMax=It->Settings.AutoExposureMaxBrightness;ExposureBias=It->Settings.AutoExposureBias;ExposureMethod=It->Settings.AutoExposureMethod;}
+        {Priority=It->Priority;ExposureMin=It->Settings.AutoExposureMinBrightness;ExposureMax=It->Settings.AutoExposureMaxBrightness;ExposureBias=It->Settings.AutoExposureBias;ExposureMethod=It->Settings.AutoExposureMethod;AuthoredBloom=It->Settings.BloomIntensity;AuthoredBloomThreshold=It->Settings.BloomThreshold;AuthoredLensFlare=It->Settings.LensFlareIntensity;}
         Exposure=GetWorld()->SpawnActor<APostProcessVolume>();Exposure->bUnbound=true;Exposure->Priority=100;Exposure->BlendWeight=0;
         auto& P=Exposure->Settings;P.bOverride_AutoExposureMinBrightness=true;P.bOverride_AutoExposureMaxBrightness=true;
         P.AutoExposureMinBrightness=ExposureMin;P.AutoExposureMaxBrightness=ExposureMax;
         P.bOverride_AutoExposureBias=true;P.AutoExposureBias=ExposureBias;
         P.bOverride_AutoExposureMethod=true;P.AutoExposureMethod=ExposureMethod;
+        P.bOverride_BloomIntensity=true;P.bOverride_BloomThreshold=true;P.bOverride_LensFlareIntensity=true;
         // Let the movable sky replace the legacy static sky before enabling
         // atmosphere; no baked atmosphere dependency is introduced.
         // A 64px sky-only GPU capture is cheap enough to update every frame.
@@ -126,6 +127,7 @@ void ACourseworkDaylight::UpdateLighting()
     const float SolarElevation=65.f*FMath::Sin(Phase*PI);
     const float DayWeight=FMath::SmoothStep(0.f,12.f,SolarElevation);
     const float NightWeight=FMath::SmoothStep(0.f,4.f,-SolarElevation);
+    const float Cloud=FMath::Clamp((WeatherCover-.1f)/.82f,0.f,1.f);
     Atmosphere->SetSkyLuminanceFactor(FLinearColor(DayWeight,DayWeight,DayWeight));
     Atmosphere->SetAerialPespectiveViewDistanceScale(DayWeight);
     const float Yaw=FMath::Lerp(-90.f,90.f,Phase);
@@ -134,11 +136,14 @@ void ACourseworkDaylight::UpdateLighting()
     // Zero removes a directional light from the render scene and changes the
     // atmosphere's source selection. Keep a negligible 0.00001-unit source
     // registered through the horizon; acceptance checks its actual raw value.
-    Sun->SetIntensity(FMath::Max(.00001f,PreviewWeight*SunStrength*(4+8*FMath::Max(0.f,FMath::Sin(Phase*PI)))*WeatherDirect));
+    Sun->SetIntensity(FMath::Max(.00001f,PreviewWeight*SunStrength*(4+8*FMath::Max(0.f,FMath::Sin(Phase*PI)))*WeatherDirect*FMath::Lerp(1.f,.4f,Cloud)));
+    Sun->SetLightSourceAngle(FMath::Lerp(.5357f,8.f,Cloud));
     Sun->SetLightColor(FMath::Lerp(FLinearColor(1,.53f,.24f),FLinearColor(1,.96f,.87f),FMath::Clamp(SolarElevation/40.f,0.f,1.f)));
     // Cloud cover reduces the direct beam, but the diffuse sky remains an
     // independent source. Do not attenuate it a second time with cloud amount.
-    Sky->SetIntensity(FMath::Lerp(.08f,.9f*WeatherDiffuse,DayWeight)*PreviewWeight);
+    // Calibrate the captured dome separately from its visible emissive scale:
+    // cloudy illumination is broad sky fill, not weakened wall occlusion.
+    Sky->SetIntensity(FMath::Lerp(.08f,.9f*WeatherDiffuse*FMath::Lerp(1.f,3.f,Cloud),DayWeight)*PreviewWeight);
     Sky->SetLightColor(FMath::Lerp(FLinearColor(.35f,.5f,1),FLinearColor(1,.98f,.93f),DayWeight));
     // Night uses the authored night exposure, sky and fill lights. Previously
     // selecting 21:00 removed those fills and forced daylight exposure to zero,
@@ -154,7 +159,15 @@ void ACourseworkDaylight::UpdateLighting()
     if(Exposure)Exposure->BlendWeight=DayBlend;
     for(const auto& S:SkyParameters)if(auto* M=S.Material.Get())
     {for(const auto& P:S.Colors)M->SetVectorParameterValue(P.Key,FLinearColor(P.Value.R*NightWeight,P.Value.G*NightWeight,P.Value.B*NightWeight,P.Value.A));for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value*NightWeight);}
-    const float Cloud=FMath::Clamp((WeatherCover-.1f)/.82f,0.f,1.f);
+    if(Exposure)
+    {
+        // The night scene's bloom (2.12, threshold .029) spreads ordinary cloudy
+        // sky pixels into white halos. Fade only daytime cloud post-processing;
+        // preserve the inherited metering and all authored night settings.
+        Exposure->Settings.BloomIntensity=FMath::Lerp(AuthoredBloom,.8f,Cloud);
+        Exposure->Settings.BloomThreshold=FMath::Lerp(AuthoredBloomThreshold,.2f,Cloud);
+        Exposure->Settings.LensFlareIntensity=FMath::Lerp(AuthoredLensFlare,0.f,Cloud);
+    }
     // Clear sky stays with the atmosphere. Fade the optional cloud dome over
     // a broad elevation range; multiplying its original night tint by a white
     // daytime tint near zero elevation caused an abrupt horizon brightening.
@@ -164,10 +177,12 @@ void ACourseworkDaylight::UpdateLighting()
         for(const auto& P:S.Colors)
         {
             FLinearColor Day=P.Value;
-            if(P.Key==TEXT("Overall Color"))Day=FLinearColor::White;
-            if(P.Key==TEXT("Zenith Color"))Day=FMath::Lerp(FLinearColor(.025f,.12f,.28f),FLinearColor(.22f,.25f,.29f),Cloud);
-            if(P.Key==TEXT("Horizon color"))Day=FMath::Lerp(FLinearColor(.38f,.60f,.82f),FLinearColor(.48f,.51f,.55f),Cloud);
-            if(P.Key==TEXT("Cloud color"))Day=FMath::Lerp(FLinearColor(.86f,.9f,.96f),FLinearColor(.36f,.39f,.43f),Cloud);
+            // The legacy night dome is emissive, not an albedo. A unit overall
+            // multiplier clipped cloudy horizons after the inherited eye adaptation.
+            if(P.Key==TEXT("Overall Color"))Day=FLinearColor(.06f,.06f,.06f);
+            if(P.Key==TEXT("Zenith Color"))Day=FMath::Lerp(FLinearColor(.025f,.12f,.28f),FLinearColor(.27f,.28f,.29f),Cloud);
+            if(P.Key==TEXT("Horizon color"))Day=FMath::Lerp(FLinearColor(.38f,.60f,.82f),FLinearColor(.50f,.51f,.52f),Cloud);
+            if(P.Key==TEXT("Cloud color"))Day=FMath::Lerp(FLinearColor(.86f,.9f,.96f),FLinearColor(.38f,.39f,.40f),Cloud);
             M->SetVectorParameterValue(P.Key,FLinearColor(P.Value.R*NightWeight+Day.R*SkyDay,P.Value.G*NightWeight+Day.G*SkyDay,P.Value.B*NightWeight+Day.B*SkyDay,P.Value.A));
         }
         for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value*NightWeight*(P.Key==TEXT("Stars brightness")?1-Cloud*.9f:1));
