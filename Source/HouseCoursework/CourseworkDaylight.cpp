@@ -82,13 +82,21 @@ bool ACourseworkDaylight::Apply(float Value)
         float ExposureMin=.15f,ExposureMax=5.f,ExposureBias=0,Priority=-FLT_MAX;
         EAutoExposureMethod ExposureMethod=AEM_Histogram;
         for(TActorIterator<APostProcessVolume> It(GetWorld());It;++It)if(It->bUnbound&&It->BlendWeight>0&&It->Priority>Priority)
-        {Priority=It->Priority;ExposureMin=It->Settings.AutoExposureMinBrightness;ExposureMax=It->Settings.AutoExposureMaxBrightness;ExposureBias=It->Settings.AutoExposureBias;ExposureMethod=It->Settings.AutoExposureMethod;AuthoredBloom=It->Settings.BloomIntensity;AuthoredBloomThreshold=It->Settings.BloomThreshold;AuthoredLensFlare=It->Settings.LensFlareIntensity;}
+        {Priority=It->Priority;ExposureMin=It->Settings.AutoExposureMinBrightness;ExposureMax=It->Settings.AutoExposureMaxBrightness;ExposureBias=It->Settings.AutoExposureBias;ExposureMethod=It->Settings.AutoExposureMethod;}
         Exposure=GetWorld()->SpawnActor<APostProcessVolume>();Exposure->bUnbound=true;Exposure->Priority=100;Exposure->BlendWeight=0;
         auto& P=Exposure->Settings;P.bOverride_AutoExposureMinBrightness=true;P.bOverride_AutoExposureMaxBrightness=true;
         P.AutoExposureMinBrightness=ExposureMin;P.AutoExposureMaxBrightness=ExposureMax;
         P.bOverride_AutoExposureBias=true;P.AutoExposureBias=ExposureBias;
         P.bOverride_AutoExposureMethod=true;P.AutoExposureMethod=ExposureMethod;
-        P.bOverride_BloomIntensity=true;P.bOverride_BloomThreshold=true;P.bOverride_LensFlareIntensity=true;
+        // Lens effects must not depend on the daylight/exposure blend: otherwise
+        // the legacy night volume reintroduces colored flare ghosts at sunset.
+        // Override only these three presentation properties; metering and every
+        // physical light/material remain under their existing controls.
+        LensEffects=GetWorld()->SpawnActor<APostProcessVolume>();LensEffects->bUnbound=true;LensEffects->Priority=200;LensEffects->BlendWeight=0;
+        auto& Lens=LensEffects->Settings;
+        Lens.bOverride_LensFlareIntensity=true;Lens.LensFlareIntensity=0;
+        Lens.bOverride_BloomIntensity=true;Lens.BloomIntensity=.45f;
+        Lens.bOverride_BloomThreshold=true;Lens.BloomThreshold=1.f;
         // Let the movable sky replace the legacy static sky before enabling
         // atmosphere; no baked atmosphere dependency is introduced.
         // A 64px sky-only GPU capture is cheap enough to update every frame.
@@ -157,17 +165,9 @@ void ACourseworkDaylight::UpdateLighting()
         if(C->GetStaticMesh()!=Desired)C->SetStaticMesh(Desired);
     }
     if(Exposure)Exposure->BlendWeight=DayBlend;
+    if(LensEffects)LensEffects->BlendWeight=PreviewWeight;
     for(const auto& S:SkyParameters)if(auto* M=S.Material.Get())
     {for(const auto& P:S.Colors)M->SetVectorParameterValue(P.Key,FLinearColor(P.Value.R*NightWeight,P.Value.G*NightWeight,P.Value.B*NightWeight,P.Value.A));for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value*NightWeight);}
-    if(Exposure)
-    {
-        // The night scene's bloom (2.12, threshold .029) spreads ordinary cloudy
-        // sky pixels into white halos. Fade only daytime cloud post-processing;
-        // preserve the inherited metering and all authored night settings.
-        Exposure->Settings.BloomIntensity=FMath::Lerp(AuthoredBloom,.8f,Cloud);
-        Exposure->Settings.BloomThreshold=FMath::Lerp(AuthoredBloomThreshold,.2f,Cloud);
-        Exposure->Settings.LensFlareIntensity=FMath::Lerp(AuthoredLensFlare,0.f,Cloud);
-    }
     // Clear sky stays with the atmosphere. Fade the optional cloud dome over
     // a broad elevation range; multiplying its original night tint by a white
     // daytime tint near zero elevation caused an abrupt horizon brightening.
@@ -227,6 +227,7 @@ void ACourseworkDaylight::Restore()
     GetWorld()->GetTimerManager().ClearTimer(AtmosphereTimer);
     Sun->SetVisibility(false);Sun->SetIntensity(0);Atmosphere->SetVisibility(false);Sky->SetVisibility(false);
     if(Exposure){Exposure->Destroy();Exposure=nullptr;}
+    if(LensEffects){LensEffects->Destroy();LensEffects=nullptr;}
     for(const auto& S:WeatherSkies)if(S.Mesh.IsValid()&&S.Original.IsValid())S.Mesh->SetMaterial(S.Slot,S.Original.Get());WeatherSkies.Empty();
     for(const auto& S:SkyParameters)if(auto* M=S.Material.Get()){for(const auto& P:S.Colors)M->SetVectorParameterValue(P.Key,P.Value);for(const auto& P:S.Brightness)M->SetScalarParameterValue(P.Key,P.Value);}
     for(const auto& S:Meshes)if(auto* C=S.Component.Get())if(auto* M=S.Original.Get())C->SetStaticMesh(M);
@@ -238,7 +239,7 @@ void ACourseworkDaylight::Restore()
 }
 bool ACourseworkDaylight::CheckRestored()const
 {
-    if(bActive||IsActorTickEnabled()||Sun->IsVisible()||Sky->IsVisible()||Atmosphere->IsVisible()||Exposure)return false;
+    if(bActive||IsActorTickEnabled()||Sun->IsVisible()||Sky->IsVisible()||Atmosphere->IsVisible()||Exposure||LensEffects)return false;
     for(const auto& S:SkyParameters)if(auto* M=S.Material.Get())
     {for(const auto& P:S.Colors){FLinearColor Color;if(!M->GetVectorParameterValue(FMaterialParameterInfo(P.Key),Color)||!Color.Equals(P.Value,.000001f))return false;}for(const auto& P:S.Brightness){float Value=0;if(!M->GetScalarParameterValue(FMaterialParameterInfo(P.Key),Value)||!FMath::IsNearlyEqual(Value,P.Value,.000001f))return false;}}
     if(auto* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.SkyLight.RealTimeReflectionCapture.TimeSlice")))if(CVar->GetInt()!=OriginalSkyTimeSlice)return false;

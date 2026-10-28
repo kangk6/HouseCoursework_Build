@@ -36,7 +36,6 @@ private:
     struct FWeatherSky{TWeakObjectPtr<class UStaticMeshComponent> Mesh;int32 Slot=0;TWeakObjectPtr<class UMaterialInterface> Original;TWeakObjectPtr<class UMaterialInstanceDynamic> Material;TArray<TPair<FName,FLinearColor>> Colors;TArray<TPair<FName,float>> Brightness;FLinearColor Direction;};
     TArray<FWeatherSky> WeatherSkies;
     float WeatherCover=.1f,WeatherDirect=1,WeatherDiffuse=1,WeatherLight=1;
-    float AuthoredBloom=0,AuthoredBloomThreshold=0,AuthoredLensFlare=0;
     struct FMeshState {TWeakObjectPtr<class UStaticMeshComponent> Component;TWeakObjectPtr<class UStaticMesh> Original;};
     TArray<FMeshState> Meshes;
     TArray<TStrongObjectPtr<UObject>> OriginalMeshReferences;
@@ -47,6 +46,7 @@ private:
     UPROPERTY() TObjectPtr<class USkyAtmosphereComponent> Atmosphere;
     UPROPERTY() TObjectPtr<class USkyLightComponent> Sky;
     UPROPERTY() TObjectPtr<class APostProcessVolume> Exposure;
+    UPROPERTY() TObjectPtr<class APostProcessVolume> LensEffects;
     bool bActive=false;
     float Hour=12,Elevation=0;
     float RenderedHour=12,PreviewWeight=0;

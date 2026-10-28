@@ -504,7 +504,7 @@ void ACourseworkHUD::TickAcceptanceTest()
     if(TestMode==TEXT("solar")){TickSolarAcceptance();return;}
     if(TestMode==TEXT("household_weather")){TickHouseholdAcceptance();return;}
     if(TestMode==TEXT("rain")||TestMode==TEXT("rain_brightness")){TickRainAcceptance();return;}
-    if(TestMode==TEXT("rain_polish")||TestMode==TEXT("rain_profile")||TestMode==TEXT("weather_exterior")){TickRainPolishAcceptance();return;}
+    if(TestMode==TEXT("lamp_glare")||TestMode==TEXT("rain_polish")||TestMode==TEXT("rain_profile")||TestMode==TEXT("weather_exterior")){TickRainPolishAcceptance();return;}
     if(TestMode==TEXT("linkage")){TickLinkageAcceptance();return;}
     if(TestMode==TEXT("interaction")){TickInteractionAcceptance();return;}
     if(TestMode==TEXT("fixture")) {TickFixtureAcceptance();return;}
