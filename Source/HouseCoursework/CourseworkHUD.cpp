@@ -28,6 +28,7 @@
 #include "Animation/AnimSequence.h"
 #include "Animation/BlendSpace1D.h"
 #include "Camera/PlayerCameraManager.h"
+#include "HAL/IConsoleManager.h"
 
 ACourseworkHUD::ACourseworkHUD()
 {
@@ -46,6 +47,17 @@ ACourseworkHUD::ACourseworkHUD()
 void ACourseworkHUD::BeginPlay()
 {
     Super::BeginPlay();
+    // Epic's 200% TSR history is a large bandwidth cost on integrated GPUs.
+    // Keep the scene/output resolution and the other AA features unchanged.
+    // Only cap inherited scalability defaults; explicit user overrides win.
+    if(!FParse::Param(FCommandLine::Get(),TEXT("HouseLegacyTemporalHistory")))
+        if(auto* History=IConsoleManager::Get().FindConsoleVariable(TEXT("r.TSR.History.ScreenPercentage")))
+            if(History->GetFloat()>150.f&&(uint32(History->GetFlags())&ECVF_SetByMask)<=ECVF_SetByScalability)
+            {
+                OriginalTsrHistoryPercentage=History->GetFloat();OriginalTsrHistoryPriority=uint32(History->GetFlags())&ECVF_SetByMask;
+                History->SetWithCurrentPriority(150.f);
+                UE_LOG(LogTemp,Display,TEXT("RENDER_HISTORY capped original=%.1f current=%.1f"),OriginalTsrHistoryPercentage,History->GetFloat());
+            }
     auto* PC = GetOwningPlayerController();
     if (!PC) return;
     FString StartupTest;FParse::Value(FCommandLine::Get(),TEXT("HouseTest="),StartupTest);
@@ -171,6 +183,13 @@ void ACourseworkHUD::EndPlay(const EEndPlayReason::Type Reason)
             if (PC->GetPawn()) PC->GetPawn()->EnableInput(PC);
         }
     }
+    if(OriginalTsrHistoryPercentage>0)
+        if(auto* History=IConsoleManager::Get().FindConsoleVariable(TEXT("r.TSR.History.ScreenPercentage")))
+            if(FMath::IsNearlyEqual(History->GetFloat(),150.f)&&(uint32(History->GetFlags())&ECVF_SetByMask)==OriginalTsrHistoryPriority)
+            {
+                History->SetWithCurrentPriority(OriginalTsrHistoryPercentage);
+                UE_LOG(LogTemp,Display,TEXT("RENDER_HISTORY restored value=%.1f"),History->GetFloat());
+            }
     Super::EndPlay(Reason);
 }
 

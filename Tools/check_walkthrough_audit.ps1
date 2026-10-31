@@ -4,7 +4,8 @@ param(
     [ValidateSet('day','rain','night','fire')][string[]]$Scenarios=@('day','rain','night','fire'),
     [ValidateSet(720,1080)][int]$Height=1080,
     [switch]$Foreground,
-    [switch]$CaptureScreenshots
+    [switch]$CaptureScreenshots,
+    [string[]]$ExtraArguments=@()
 )
 $ErrorActionPreference='Stop'
 if($Foreground -and $CaptureScreenshots){throw 'Performance runs must not capture screenshots; use a separate visual run.'}
@@ -24,6 +25,7 @@ foreach($scenario in $Scenarios){
     if(!$Foreground){$arguments+='-RenderOffscreen'}
     if(!$CaptureScreenshots){$arguments+='-HouseNoRouteScreenshots'}
     if($scenario -eq 'night' -and $CaptureScreenshots){$arguments+='-HouseSmartNightRoute'}
+    $arguments+=$ExtraArguments
     $process=Start-Process -FilePath (Join-Path $GameRoot 'HouseCoursework.exe') -ArgumentList $arguments -WindowStyle Hidden -PassThru
     $timedOut=$false
     while(!$process.WaitForExit(1000)){
@@ -55,7 +57,7 @@ foreach($scenario in $Scenarios){
     if($report.scenario -ne $scenario -or $report.resolution[1] -ne $Height){throw "$stem ran with incorrect conditions"}
     $performance=if($Foreground){$report.benchmark_eligible -and $report.average_fps -ge 25}else{$null}
     $runs+=@{scenario=$scenario;functional_passed=$functional;performance_passed=$performance;benchmark_eligible=$report.benchmark_eligible;average_fps=$report.average_fps;p95_ms=$report.p95_ms;frames_over_100ms=$report.frames_over_100ms;report=($stem+'.json')}
-    @{binary_sha256=$binary;foreground_requested=[bool]$Foreground;scope='Native CharacterMovement and actual E input on a continuous route. Background captures are not a foreground FPS certification. Fixed scripted steering does not certify physical mouse use or every object.';runs=$runs}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $EvidenceRoot 'walkthrough_summary.json') -Encoding utf8
+    @{binary_sha256=$binary;foreground_requested=[bool]$Foreground;extra_arguments=$ExtraArguments;scope='Native CharacterMovement and actual E input on a continuous route. Background captures are not a foreground FPS certification. Fixed scripted steering does not certify physical mouse use or every object.';runs=$runs}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $EvidenceRoot 'walkthrough_summary.json') -Encoding utf8
     if(!$functional){throw "$stem route failed; inspect the saved position and blocker"}
     if($Foreground -and !$performance){throw "$stem did not qualify: require foreground throughout, no screenshots, and average FPS >= 25"}
     Write-Output "$stem functional checks passed; foreground benchmark eligible=$($report.benchmark_eligible)"

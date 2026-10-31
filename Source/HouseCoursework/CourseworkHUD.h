@@ -146,6 +146,8 @@ public:
     int32 GetMapFloor() const { return SelectedMapFloor; }
     void SelectMapFloor(int32 Floor);
 private:
+    float OriginalTsrHistoryPercentage=-1.f;
+    uint32 OriginalTsrHistoryPriority=0;
     UPROPERTY() TObjectPtr<UCourseworkOverlay> Overlay;
     TMap<TWeakObjectPtr<USceneComponent>, FTransform> ClosedTransforms;
     TMap<TWeakObjectPtr<USceneComponent>, uint32> FurnitureActionRevisions;

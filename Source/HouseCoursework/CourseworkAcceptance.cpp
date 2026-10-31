@@ -18,6 +18,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWindow.h"
 #include "HAL/PlatformApplicationMisc.h"
+#include "HAL/IConsoleManager.h"
 
 static FVector AcceptanceAimPoint(UStaticMeshComponent* C,const FVector& Eye,float Height,float Side=0.f)
 {
@@ -339,6 +340,8 @@ void ACourseworkHUD::TickComprehensiveAcceptance()
                 const bool Screenshots=!FParse::Param(FCommandLine::Get(),TEXT("HouseNoRouteScreenshots"));
                 const bool Eligible=!Offscreen&&!Screenshots&&Audit.ForegroundFrames==AcceptanceFrameTimes.Num()&&AcceptanceFrameTimes.Num()>500;
                 AuditFields=FString::Printf(TEXT(",\"scenario\":\"%s\",\"warmup_seconds\":15,\"offscreen\":%s,\"foreground_frames\":%d,\"benchmark_eligible\":%s,\"resolution\":[%d,%d],\"gpu_mean_ms\":%.4f"),*Audit.Scenario,Offscreen?TEXT("true"):TEXT("false"),Audit.ForegroundFrames,Eligible?TEXT("true"):TEXT("false"),Audit.Size.X,Audit.Size.Y,Audit.GpuTotal/FMath::Max(1,AcceptanceFrameTimes.Num()));
+                auto Value=[](const TCHAR* Name){auto* V=IConsoleManager::Get().FindConsoleVariable(Name);return V?V->GetFloat():-1.f;};
+                AuditFields+=FString::Printf(TEXT(",\"tsr_history_percentage\":%.3f,\"screen_percentage_cvar\":%.3f,\"default_screen_percentage\":%.3f,\"default_desktop_mode\":%.0f,\"aa_method\":%.0f"),Value(TEXT("r.TSR.History.ScreenPercentage")),Value(TEXT("r.ScreenPercentage")),Value(TEXT("r.ScreenPercentage.Default")),Value(TEXT("r.ScreenPercentage.Default.Desktop.Mode")),Value(TEXT("r.AntiAliasingMethod")));
                 bool Conditions=FMath::IsNearlyEqual(GetDaylightHour(),Audit.Scenario==TEXT("night")?0.f:12.f,.01f)&&!Clock.bRunning;
                 if(Audit.Scenario==TEXT("rain"))Conditions&=Weather.Rain>.99f;
                 if(Audit.Scenario==TEXT("night"))Conditions&=SmartLightingScene==1&&SmartManualRooms.Num()==0&&NeedsNightLighting();
