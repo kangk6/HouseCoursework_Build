@@ -82,6 +82,8 @@ void ACourseworkVentilation::BeginPlay()
     FTransform PT=Transform;PT.SetLocation(Transform.TransformPosition(S.ProxyCenter));Proxy->SetWorldTransform(PT);W.Proxy=Proxy;
     auto* Audio=NewObject<UAudioComponent>(this);AddInstanceComponent(Audio);Audio->SetupAttachment(Proxy);Audio->bAutoActivate=false;Audio->SetSound(WindSound);Audio->bOverrideAttenuation=true;
     Audio->AttenuationOverrides.bAttenuate=true;Audio->AttenuationOverrides.bSpatialize=true;Audio->AttenuationOverrides.AttenuationShapeExtents=FVector(45);Audio->AttenuationOverrides.FalloffDistance=350;Audio->RegisterComponent();W.Audio=Audio;
+    Audio->AttenuationOverrides.bEnableOcclusion=true;Audio->AttenuationOverrides.OcclusionTraceChannel=ECC_Visibility;
+    Audio->AttenuationOverrides.OcclusionLowPassFilterFrequency=700;Audio->AttenuationOverrides.OcclusionVolumeAttenuation=.3f;Audio->AttenuationOverrides.OcclusionInterpolationTime=.35f;
     const int32 Index=Windows.Add(W);WindowLookup.Add(Sash,Index);WindowLookup.Add(Proxy,Index);
    }
   }
@@ -132,6 +134,8 @@ int32 ACourseworkVentilation::GetOpenExteriorDoorCount()const{int32 N=0;for(cons
 void ACourseworkVentilation::Tick(float Dt)
 {
  Super::Tick(Dt);if(bRestored)return;
+ const float Time=GetWorld()->GetTimeSeconds();
+ auto Breeze=[&](FVector Position){const float Phase=Position.X*.017f+Position.Y*.013f;return .82f+.1f*FMath::Sin(Time*.53f+Phase)+.08f*FMath::Sin(Time*1.11f+Phase*.61f);};
  for(auto& W:Windows)
  {
   W.Amount=FMath::FInterpConstantTo(W.Amount,W.Target,Dt,1.35f);
@@ -139,12 +143,14 @@ void ACourseworkVentilation::Tick(float Dt)
   if(auto* A=W.Audio.Get())
   {
    W.AirResponse=FMath::FInterpTo(W.AirResponse,bSuspended?0.f:CourseworkAirNetwork::Response(W.Exchange),Dt,2.f);
-   const float Gain=W.AirResponse*.26f;
-   A->SetVolumeMultiplier(Gain);if(Gain>.002f&&!A->IsPlaying())A->Play();else if(Gain<=.002f&&A->IsPlaying())A->Stop();
+   const float Gain=W.AirResponse*.26f*Breeze(W.Center);
+   A->SetVolumeMultiplier(Gain);A->SetPitchMultiplier(1.f+.025f*FMath::Sin(Time*.21f+W.Center.Y*.019f));
+   if(Gain>.002f&&!A->IsPlaying()){const float Duration=WindSound?WindSound->Duration:0;const float Start=Duration>0?FMath::Fmod(FMath::Abs(W.Center.X*.031f+W.Center.Y*.017f),Duration):0;A->Play(Start);}
+   else if(Gain<=.002f&&A->IsPlaying())A->Stop();
   }
  }
  for(auto& P:Plants){P.Amount=FMath::FInterpTo(P.Amount,bSuspended?0.f:P.Target,Dt,3.f);if(auto* M=P.Material.Get())M->SetScalarParameterValue(TEXT("CourseworkWindAmount"),P.Amount);}
- for(auto& C:Curtains){C.Amount=FMath::FInterpTo(C.Amount,bSuspended?0.f:C.Target,Dt,1.7f);if(C.Target==0&&C.Amount<.01f)C.Amount=0;if(auto* M=C.Material.Get())M->SetScalarParameterValue(TEXT("CurtainWindAmount"),C.Amount);}
+ for(auto& C:Curtains){const FVector Position=C.Mesh.IsValid()?C.Mesh->Bounds.Origin:C.Transform.GetLocation();const float Envelope=Breeze(Position+FVector(C.Slot*31,0,0));C.Amount=FMath::FInterpTo(C.Amount,bSuspended?0.f:C.Target*Envelope,Dt,1.7f);if(C.Target==0&&C.Amount<.01f)C.Amount=0;C.Direction=FMath::VInterpTo(C.Direction,C.TargetDirection,Dt,2.5f);if(auto* M=C.Material.Get()){M->SetScalarParameterValue(TEXT("CurtainWindAmount"),C.Amount);M->SetScalarParameterValue(TEXT("CurtainDX"),C.Direction.X);M->SetScalarParameterValue(TEXT("CurtainDY"),C.Direction.Y);}}
  uint64 State=bSuspended?1:0;
  auto OpeningState=[](float Amount){return Amount<=0.f?0:Amount>=1.f?22:1+FMath::FloorToInt(Amount*20);};
  for(const auto& W:Windows)State=State*23+OpeningState(W.Amount);
@@ -153,6 +159,9 @@ void ACourseworkVentilation::Tick(float Dt)
  RebuildElapsed+=Dt;if(State!=LastState&&RebuildElapsed>.2f){LastState=State;RebuildElapsed=0;RebuildFlow();}
  for(int32 I=0;I<RoomStrength.Num();++I)RoomStrength[I]=FMath::FInterpTo(RoomStrength[I],RoomTarget[I],Dt,3.f);
  VisualWeight=FMath::FInterpTo(VisualWeight,IsDisplayed()?1.f:0.f,Dt,5.f);
+ auto Advance=[&](FFlowPath& P){const float Target=P.Cross?FMath::Lerp(36.f,100.f,CourseworkAirNetwork::Response(P.Flux)):24.f;P.Speed=FMath::FInterpTo(P.Speed,Target,Dt,2.5f);P.Motion=FMath::Fmod(P.Motion+Dt*P.Speed,P.Length+80.f);};
+ for(auto& P:Paths)Advance(P);for(auto& P:RetiringPaths)Advance(P);
+ RetiringPaths.RemoveAll([&](const FFlowPath& P){return Time-P.Retired>.45f;});
 }
 bool ACourseworkVentilation::SegmentClear(const FVector& A,const FVector& B)const
 {
@@ -188,7 +197,7 @@ TArray<FVector> ACourseworkVentilation::FindAirPath(FVector Start,FVector End)co
 void ACourseworkVentilation::RebuildFlow()
 {
 
- Paths.Empty();RoomTarget.Init(0,FlowRoomCount);CrossRooms.Init(false,FlowRoomCount);for(auto& W:Windows){W.Flow=0;W.Exchange=0;}for(auto& P:Plants)P.Target=0;PressureResidual=0;for(auto& C:Curtains)C.Target=0;if(bSuspended)return;
+ TArray<FFlowPath> Previous=MoveTemp(Paths);Paths.Reset();RoomTarget.Init(0,FlowRoomCount);CrossRooms.Init(false,FlowRoomCount);for(auto& W:Windows){W.Flow=0;W.Exchange=0;}for(auto& P:Plants)P.Target=0;PressureResidual=0;for(auto& C:Curtains)C.Target=0;if(bSuspended){RetiringPaths.Empty();return;}
  // A steady relative-pressure network, not a velocity-field/CFD solver. Exterior
  // east->west wind: windward +1, leeward -.5, side faces -.25. Interior pressure
  // is solved from conservation at each room, including both real exterior doors.
@@ -229,8 +238,10 @@ void ACourseworkVentilation::RebuildFlow()
   }Smooth.Add(Points.Last());
   FFlowPath P;P.Points=MoveTemp(Smooth);P.Room=Room;P.Cross=Cross;P.InletPressure=Inlet;P.OutletPressure=Outlet;P.Born=GetWorld()->GetTimeSeconds();P.Flux=Flux;
   for(int32 I=1;I<P.Points.Num();++I){if(!SegmentClear(P.Points[I-1],P.Points[I]))return false;P.Length+=FVector::Dist(P.Points[I-1],P.Points[I]);}if(P.Length<15)return false;
-  const int32 Count=Cross?FMath::Clamp(FMath::CeilToInt(Flux*10.f),2,6):2;
+  const int32 Count=Cross?FMath::Clamp(FMath::Max(FMath::CeilToInt(Flux*10.f),FMath::CeilToInt(P.Length/250.f)),2,7):2;
   for(int32 N=0;N<Count;++N){FVector Offset(0,0,(N%3-1)*4.f);for(int32 K=1;K<P.Points.Num();++K)if(!SegmentClear(P.Points[K-1]+Offset,P.Points[K]+Offset)){Offset=FVector::ZeroVector;break;}P.Offsets.Add(Offset);}
+  for(int32 I=0;I<Previous.Num();++I)if(Previous[I].Cross==P.Cross&&Previous[I].Room==P.Room&&Previous[I].Points[0].Equals(P.Points[0],2)&&Previous[I].Points.Last().Equals(P.Points.Last(),2))
+  {P.Born=Previous[I].Born;P.Motion=Previous[I].Motion;P.Speed=Previous[I].Speed;Previous.RemoveAt(I);++PathReuseCount;break;}
   Paths.Add(MoveTemp(P));return true;
  };
  // Trace only along descending room pressure. A doorway cannot simultaneously
@@ -275,8 +286,12 @@ void ACourseworkVentilation::RebuildFlow()
  FCollisionQueryParams Q(SCENE_QUERY_STAT(LeafWindOcclusion),true);Q.AddIgnoredComponent(M);for(const auto& O:Windows)if(O.Proxy.IsValid())Q.AddIgnoredComponent(O.Proxy.Get());FHitResult Hit;
  if(!GetWorld()->LineTraceSingleByChannel(Hit,W.Center+W.Inward*20,Leaf,ECC_Visibility,Q))P.Target=FMath::Max(P.Target,CourseworkAirNetwork::Response(W.Exchange)*FMath::Clamp(1-Distance/400.f,0.f,1.f));}
  for(auto& C:Curtains)if(auto* Mesh=C.Mesh.Get())for(const auto& W:Windows){const auto P=Mesh->Bounds.Origin;const auto D=P-W.Center;const float Along=FVector::DotProduct(D,W.Inward);const float Lateral=(D-W.Inward*Along).Size();if(W.Amount<.15f||Along< -12||Along>90||Lateral>190)continue;
- const float Strength=CourseworkAirNetwork::Response(W.Exchange)*FMath::Clamp(1-Lateral/240.f,0.f,1.f);const bool Sheer=C.Original.IsValid()&&C.Original->GetBlendMode()==BLEND_Translucent;const float Target=Strength*(Sheer?3.f:1.6f);if(Target>C.Target){C.Target=Target;if(auto* M=C.Material.Get()){const float Direction=W.Flow<-.008f?-1.f:1.f;M->SetScalarParameterValue(TEXT("CurtainDX"),Direction*W.Inward.X);M->SetScalarParameterValue(TEXT("CurtainDY"),Direction*W.Inward.Y);}}
+ const float Strength=CourseworkAirNetwork::Response(W.Exchange)*FMath::Clamp(1-Lateral/240.f,0.f,1.f);const bool Sheer=C.Original.IsValid()&&C.Original->GetBlendMode()==BLEND_Translucent;const float Target=Strength*(Sheer?3.f:1.6f);if(Target>C.Target){C.Target=Target;C.TargetDirection=(W.Flow<-.008f?-1.f:1.f)*W.Inward;}
  }
+ // Retain only a short visual tail. Rendering checks the moving door/window
+ // collision again, so the retired trail cannot continue through a closed leaf.
+ const float Now=GetWorld()->GetTimeSeconds();for(auto& P:Previous){P.Retired=Now;RetiringPaths.Add(MoveTemp(P));++PathRetireCount;}
+ if(RetiringPaths.Num()>24)RetiringPaths.RemoveAt(0,RetiringPaths.Num()-24);
  if(IsDisplayed()){for(const auto& P:Paths)if(P.Cross){FString Line;for(const auto& V:P.Points)Line+=V.ToCompactString()+TEXT(";");UE_LOG(LogTemp,Verbose,TEXT("VENTILATION_PATH %s"),*Line);}}
  UE_LOG(LogTemp,Display,TEXT("VENTILATION_FLOW open=%d exterior_doors=%d paths=%d cross=%d balance_error=%.6f"),GetOpenCount(),GetOpenExteriorDoorCount(),Paths.Num(),GetCrossPathCount(),PressureResidual);
 }
@@ -323,6 +338,7 @@ FVector ACourseworkVentilation::GetFlowFocus()const
 FString ACourseworkVentilation::GetRenderDiagnostics()const
 {
  FString Result=FString::Printf(TEXT("backend=world-projected translucent trails with view occlusion; relative-pressure network; exterior_wind=(-1,0,0); exterior_doors=%d; residual=%.6f; display=%d segments=%d focus=%s"),GetOpenExteriorDoorCount(),PressureResidual,IsDisplayed(),LastDrawSegments,*GetFlowFocus().ToString());
+ Result+=FString::Printf(TEXT("\ntrail_reused=%d trail_retired=%d retiring_now=%d"),PathReuseCount,PathRetireCount,RetiringPaths.Num());
  for(const auto& W:Windows)Result+=FString::Printf(TEXT("\nwindow room=%d pose=%.3f net_flux=%.5f exchange=%.5f response=%.4f"),W.Room,W.Amount,W.Flow,W.Exchange,W.AirResponse);
  for(const auto& P:Paths){Result+=FString::Printf(TEXT("\nlength=%.2f cross=%d room=%d pressure=%.3f->%.3f flux=%.5f"),P.Length,P.Cross,P.Room,P.InletPressure,P.OutletPressure,P.Flux);for(const auto& V:P.Points)Result+=TEXT(" ")+V.ToCompactString();}return Result;
 }
@@ -343,20 +359,30 @@ void ACourseworkVentilation::DrawAirflow(UCanvas* Canvas,APlayerController* PC)
  auto Along=[](const FFlowPath& P,float D){for(int32 I=1;I<P.Points.Num();++I){const float L=FVector::Dist(P.Points[I-1],P.Points[I]);if(D<=L)return FMath::Lerp(P.Points[I-1],P.Points[I],L>0?D/L:0.f);D-=L;}return P.Points.Last();};
  TArray<FCanvasUVTri> Triangles;
  const float Time=GetWorld()->GetTimeSeconds();
- for(int32 Index=0;Index<Paths.Num();++Index){const auto& P=Paths[Index];const float Strength=GetRoomStrength(P.Room),Fade=FMath::SmoothStep(0.f,.4f,Time-P.Born);if(Strength<.01f)continue;
- const int32 Count=P.Offsets.Num();for(int32 N=0;N<Count;++N){const float Speed=P.Cross?FMath::Lerp(36.f,100.f,CourseworkAirNetwork::Response(P.Flux)):24.f;const float Head=FMath::Fmod(Time*Speed+P.Length*(N+.23f*Index)/Count,P.Length+64.f);
- for(int32 K=0;K<12;++K){const float T=float(K)/12,D=Head-(1-T)*52.f,D2=D+52.f/12;if(D<0||D2>P.Length)continue;const FVector A=Along(P,D)+P.Offsets[N],B=Along(P,D2)+P.Offsets[N],Mid=(A+B)*.5f;FVector2D ScreenA,ScreenB;
+ auto DrawPath=[&](const FFlowPath& P,int32 Index){const bool Retired=P.Retired>=0;const float Strength=Retired?.45f:GetRoomStrength(P.Room),Fade=FMath::SmoothStep(0.f,.4f,Time-P.Born)*(Retired?1-FMath::SmoothStep(0.f,.45f,Time-P.Retired):1);if(Strength<.01f)return;
+ const float Tail=P.Cross?74.f:45.f;const int32 Count=P.Offsets.Num();for(int32 N=0;N<Count;++N){const float Head=FMath::Fmod(P.Motion+P.Length*(N+.23f*Index)/Count,P.Length+80.f);
+ for(int32 K=0;K<12;++K){const float T=float(K)/12,D=Head-(1-T)*Tail,D2=D+Tail/12;if(D<0||D2>P.Length)continue;const FVector A=Along(P,D)+P.Offsets[N],B=Along(P,D2)+P.Offsets[N],Mid=(A+B)*.5f;FVector2D ScreenA,ScreenB;
+ if(Retired&&!SegmentClear(A,B))continue;
  const float Distance=FVector::Dist(Eye,Mid);if(Distance<90.f)continue;
  if(!PC->ProjectWorldLocationToScreen(A,ScreenA)||!PC->ProjectWorldLocationToScreen(B,ScreenB))continue;
  FHitResult Hit;if(GetWorld()->LineTraceSingleByChannel(Hit,Eye,Mid,ECC_Visibility,Q)&&FVector::Dist(Hit.ImpactPoint,Mid)>2.f)continue;
  const FVector2D Delta=(ScreenB-ScreenA).GetSafeNormal(),Right(-Delta.Y,Delta.X);
- const float Width=FMath::Clamp(260.f/Distance,.65f,1.65f)*Canvas->SizeY/900.f;
- const float Alpha=VisualWeight*Fade*.52f*(.12f+.88f*T*T)*FMath::Clamp(Strength*2,0.f,1.f)*FMath::SmoothStep(90.f,140.f,Distance);
- const FLinearColor Color(.5f,.74f,.78f,Alpha);
+ const float Width=FMath::Clamp(360.f/Distance,.8f,1.8f)*Canvas->SizeY/900.f;
+ const float Alpha=VisualWeight*Fade*.64f*(.12f+.88f*T*T)*FMath::Clamp(Strength*2,0.f,1.f)*FMath::SmoothStep(90.f,140.f,Distance);
+ const FLinearColor Color(.65f,.82f,.84f,Alpha);
  FCanvasUVTri A0;A0.V0_Pos=ScreenA-Right*Width;A0.V1_Pos=ScreenA+Right*Width;A0.V2_Pos=ScreenB+Right*Width;A0.V0_Color=A0.V1_Color=A0.V2_Color=Color;A0.V0_UV=A0.V1_UV=A0.V2_UV=FVector2D::ZeroVector;
  FCanvasUVTri B0=A0;B0.V1_Pos=ScreenB+Right*Width;B0.V2_Pos=ScreenB-Right*Width;Triangles.Add(A0);Triangles.Add(B0);++LastDrawSegments;
- }}}
+ }}};
+ for(int32 I=0;I<Paths.Num();++I)DrawPath(Paths[I],I);
+ for(int32 I=0;I<RetiringPaths.Num();++I)DrawPath(RetiringPaths[I],I);
  if(Triangles.Num()){FCanvasTriangleItem Item(Triangles,GWhiteTexture);Item.BlendMode=SE_BLEND_Translucent;Canvas->DrawItem(Item);}
+}
+bool ACourseworkVentilation::CheckPolishState()const
+{
+ for(const auto& P:Paths)if(!FMath::IsFinite(P.Motion)||!FMath::IsFinite(P.Speed)||P.Motion<0||P.Motion>P.Length+80.f||P.Speed<23||P.Speed>101)return false;
+ for(const auto& C:Curtains)if(!FMath::IsFinite(C.Amount)||C.Amount<0||C.Amount>3.01f||C.Direction.Size()>1.01f)return false;
+ for(const auto& W:Windows)if(auto* A=W.Audio.Get())if(A->VolumeMultiplier<0||A->VolumeMultiplier>.261f||A->PitchMultiplier<.97f||A->PitchMultiplier>1.03f||!A->AttenuationOverrides.bEnableOcclusion)return false;
+ return RetiringPaths.Num()<=24;
 }
 
 bool ACourseworkVentilation::CheckCurtains(bool Moving)const

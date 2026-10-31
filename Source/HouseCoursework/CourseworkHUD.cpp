@@ -512,7 +512,7 @@ void ACourseworkHUD::TickAcceptanceTest()
     if (!Character || GetWorld()->GetRealTimeSeconds() - TestStartTime < 3) return;
     if(TestMode.StartsWith(TEXT("lighting_state_"))) { TickLightingStateAcceptance(); return; }
     if(TestMode==TEXT("ventilation_perf")){TickVentilationPerformance();return;}
-    if(TestMode==TEXT("ventilation")||TestMode==TEXT("ventilation_view")){TickVentilationAcceptance();return;}
+    if(TestMode==TEXT("ventilation")||TestMode==TEXT("ventilation_view")||TestMode==TEXT("ventilation_polish")){TickVentilationAcceptance();return;}
     if(TestMode==TEXT("clock")){TickClockAcceptance();return;}
     if(TestMode==TEXT("day_cycle")){TickDayCycleAcceptance();return;}
     if(TestMode==TEXT("drill_restore")){TickDrillRestoreAcceptance();return;}

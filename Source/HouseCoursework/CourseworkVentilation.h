@@ -52,6 +52,8 @@ public:
     FVector GetFlowFocus()const;
     FString GetRenderDiagnostics()const;
     FVector GetResponseSample()const;
+    bool CheckPolishState()const;
+    FIntPoint GetTrailTransitionCounts()const{return {PathReuseCount,PathRetireCount};}
     void DrawAirflow(UCanvas* Canvas,APlayerController* Controller);
     bool CheckClosedPoses()const;
     bool CheckWindowGeometry(int32 Index,bool Open)const;
@@ -80,8 +82,8 @@ private:
     };
     struct FOriginal {TWeakObjectPtr<UStaticMeshComponent> Mesh;bool Visible,Hidden;ECollisionEnabled::Type Collision;};
     struct FDoor {TWeakObjectPtr<UStaticMeshComponent> Mesh;FTransform Closed;FVector Portal;int32 A,B;float Amount=0;};
-    struct FFlowPath {TArray<FVector> Points,Offsets;int32 Room=0;bool Cross=false;float Length=0,Born=0,InletPressure=0,OutletPressure=0,Flux=0;};
-    struct FPlant {TWeakObjectPtr<UStaticMeshComponent> Mesh;TWeakObjectPtr<UMaterialInterface> Original;TWeakObjectPtr<UMaterialInstanceDynamic> Material;FTransform Transform;int32 Slot=0;float Target=0,Amount=0;};
+    struct FFlowPath {TArray<FVector> Points,Offsets;int32 Room=0;bool Cross=false;float Length=0,Born=0,InletPressure=0,OutletPressure=0,Flux=0,Motion=0,Speed=24,Retired=-1;};
+    struct FPlant {TWeakObjectPtr<UStaticMeshComponent> Mesh;TWeakObjectPtr<UMaterialInterface> Original;TWeakObjectPtr<UMaterialInstanceDynamic> Material;FTransform Transform;int32 Slot=0;float Target=0,Amount=0;FVector Direction=FVector::ZeroVector,TargetDirection=FVector::ZeroVector;};
     TArray<FPlant> Plants;
     TArray<FPlant> Curtains;
     TMap<UStaticMeshComponent*,ECollisionResponse> CurtainCollision;
@@ -96,6 +98,7 @@ private:
     TArray<FOriginal> Originals;
     TArray<FDoor> Doors;
     TArray<FFlowPath> Paths;
+    TArray<FFlowPath> RetiringPaths;
     TArray<float> RoomTarget,RoomStrength;
     TArray<bool> CrossRooms;
     TMap<const UPrimitiveComponent*,int32> WindowLookup;
@@ -105,6 +108,7 @@ private:
     float RebuildElapsed=0,VisualWeight=0;
     float PressureResidual=0;
     int32 LastDrawSegments=0;
+    int32 PathReuseCount=0,PathRetireCount=0;
     uint64 LastState=MAX_uint64;
     bool bDisplay=false,bSuspended=false,bRestored=false;
     void RebuildFlow();

@@ -3,6 +3,9 @@
 #include "Misc/Parse.h"
 #include "CourseworkVentilation.h"
 #include "CourseworkAirNetwork.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "AudioMixerBlueprintLibrary.h"
 #include "CourseworkDaylight.h"
 #include "CourseworkOverlay.h"
 #include "GameFramework/Character.h"
@@ -47,6 +50,44 @@ void ACourseworkHUD::TickVentilationAcceptance()
   }
   return false;
  };
+ if(TestMode==TEXT("ventilation_polish"))
+ {
+  struct FReview{int32 Stage=0,Frame=0;double At=0,LastShot=0;bool Valid=true;TWeakObjectPtr<ACameraActor> Camera;TWeakObjectPtr<UStaticMeshComponent> Door;};static FReview V;
+  const FString AudioPath=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("VentilationAudio"));
+  auto StartAudio=[&](){UAudioMixerBlueprintLibrary::StartRecordingOutput(this,6.f);};
+  auto StopAudio=[&](const TCHAR* Name){UAudioMixerBlueprintLibrary::StopRecordingOutput(this,EAudioRecordingExportType::WavFile,Name,AudioPath);};
+  if(TestCase<0)
+  {
+   TestCase=0;V=FReview();V.At=Now;SetPanel(0);SetTimeFlowing(false);SetDaylightHour(12);Daylight->Snap(12);Ventilation->CloseAll();Ventilation->SetDisplay(true);
+   Player->GetCharacterMovement()->DisableMovement();
+   int32 Window=INDEX_NONE;for(int32 I=0;I<Ventilation->GetWindowCount();++I)if(Ventilation->GetWindowRoom(I)==4&&Ventilation->GetWindowInward(I).X<-.5f){Window=I;break;}
+   Record(TEXT("study_windward_window_available"),Window!=INDEX_NONE);
+   if(Window==INDEX_NONE){TestMode.Empty();QuitApplication();return;}
+   const FVector Center=Ventilation->GetWindowPoint(Window),Inward=Ventilation->GetWindowInward(Window),Side=FVector::CrossProduct(FVector::UpVector,Inward);
+   auto* Camera=GetWorld()->SpawnActor<ACameraActor>();V.Camera=Camera;Camera->SetActorLocation(Center+Inward*170+Side*55+FVector(0,0,15));Camera->SetActorRotation((Center+Inward*30-Camera->GetActorLocation()).Rotation());Camera->GetCameraComponent()->SetFieldOfView(78);
+   PC->SetViewTarget(Camera);PC->SetAudioListenerOverride(Camera->GetRootComponent(),FVector::ZeroVector,FRotator::ZeroRotator);Ventilation->ToggleWindow(Window);
+   for(TActorIterator<AActor> It(GetWorld());It;++It)if(It->GetName()==TEXT("BP_Door_Inside_A2_5")){TArray<UStaticMeshComponent*> Parts;It->GetComponents(Parts);for(auto* M:Parts)if(M->GetName()==TEXT("Door"))V.Door=M;}
+   return;
+  }
+  V.Valid&=Ventilation->CheckPolishState();
+  if((V.Stage==1||V.Stage==3||V.Stage==4)&&Now-V.LastShot>.25){V.LastShot=Now;FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/FString::Printf(TEXT("Screenshots/Polish_%d_%03d.png"),V.Stage,V.Frame++),true,false);}
+  const double Duration=V.Stage==1||V.Stage==3?5.:V.Stage==5?3.:2.;if(Now-V.At<Duration)return;V.At=Now;
+  switch(V.Stage++)
+  {
+   case 0:Record(TEXT("single_window_has_no_false_crossflow"),!Ventilation->HasCrossFlow(4));StartAudio();break;
+   case 1:StopAudio(TEXT("single"));SetRoomWindows(8,true);Record(TEXT("study_door_available"),V.Door.IsValid());if(V.Door.IsValid())InvokeFurniture(V.Door->GetOwner(),V.Door.Get());break;
+   case 2:Record(TEXT("open_hall_door_forms_study_crossflow"),Ventilation->HasCrossFlow(4)&&Ventilation->CheckPathsClear());StartAudio();break;
+   case 3:StopAudio(TEXT("cross"));Ventilation->CloseAll();if(V.Door.IsValid())InvokeFurniture(V.Door->GetOwner(),V.Door.Get());break;
+   case 4:Record(TEXT("closing_windows_removes_active_routes"),Ventilation->GetPathCount()==0);StartAudio();break;
+   case 5:StopAudio(TEXT("closed"));break;
+   default:
+    Record(TEXT("transition_values_finite_and_bounded"),V.Valid);Record(TEXT("closed_fabric_settles_and_audio_gain_silences"),Ventilation->CheckCurtains(false)&&Ventilation->GetResponseSample().Y<.002);
+    const FIntPoint Transitions=Ventilation->GetTrailTransitionCounts();Record(TEXT("routes_reuse_motion_and_retire_old_tails"),Transitions.X>0&&Transitions.Y>0);
+    FFileHelper::SaveStringToFile(Ventilation->GetRenderDiagnostics(),*(FPaths::ProjectSavedDir()/TEXT("VentilationPolishRendering.txt")));
+    FFileHelper::SaveStringToFile(TEXT("{\"method\":\"Fixed study camera and audio listener; single window, hall crossflow and closed master-mix recordings; synthetic private profile\",\"checks\":[")+FString::Join(TestResults,TEXT(","))+TEXT("]}"),*(FPaths::ProjectSavedDir()/TEXT("VentilationPolish.json")));PC->ClearAudioListenerOverride();TestMode.Empty();QuitApplication();return;
+  }
+  return;
+ }
  if(TestMode==TEXT("ventilation_view"))
  {
   if(Now-R.At<2)return;R.At=Now;
