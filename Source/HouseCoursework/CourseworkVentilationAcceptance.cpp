@@ -2,6 +2,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "CourseworkVentilation.h"
+#include "CourseworkAirNetwork.h"
 #include "CourseworkDaylight.h"
 #include "CourseworkOverlay.h"
 #include "GameFramework/Character.h"
@@ -22,7 +23,7 @@
 void ACourseworkHUD::TickVentilationAcceptance()
 {
  if(!bLightingReady||!Ventilation)return;
- struct FRun{int32 Phase=0,Window=0,Step=0;double At=0;TArray<bool> On;TArray<float> Levels;TWeakObjectPtr<UStaticMeshComponent> Door;};
+ struct FRun{int32 Phase=0,Window=0,Step=0;double At=0;FVector LocalResponse=FVector::ZeroVector;TArray<bool> On;TArray<float> Levels;TWeakObjectPtr<UStaticMeshComponent> Door;};
  static FRun R;const double Now=GetWorld()->GetRealTimeSeconds();auto* PC=GetOwningPlayerController();auto* Player=Cast<ACharacter>(PC->GetPawn());
  auto Record=[&](FString Name,bool Pass){TestResults.Add(FString::Printf(TEXT("{\"case\":\"%s\",\"passed\":%s}"),*Name,Pass?TEXT("true"):TEXT("false")));UE_LOG(LogTemp,Display,TEXT("VENTILATION_CHECK %s"),*TestResults.Last());};
  auto Key=[&](bool Down){PC->InputKey(FInputKeyParams(EKeys::E,Down?IE_Pressed:IE_Released,Down?1.:0.));};
@@ -61,6 +62,28 @@ void ACourseworkHUD::TickVentilationAcceptance()
   TestCase=0;R=FRun();R.At=Now;ResetKitchenAlarm();RestoreEnergyComparison();RestoreDaylight();Ventilation->CloseAll();Ventilation->SetDisplay(false);
   R.On=RoomLightOn;R.Levels=RoomBrightness;Player->GetCharacterMovement()->DisableMovement();
   Record(TEXT("assets_and_runtime_ready"),Ventilation->IsReady());Record(TEXT("all_twelve_modules_sixteen_moving_leaves"),Ventilation->GetWindowCount()==16);
+  {
+   using namespace CourseworkAirNetwork;
+   TArray<float> P;TArray<CourseworkAirNetwork::FEdge> Sym={{0,INDEX_NONE,1,1},{0,INDEX_NONE,1,-.5f}};
+   const float Balance=Solve(1,Sym,P),Full=FMath::Abs(Sym[0].Flow);
+   Record(TEXT("orifice_network_matches_symmetric_analytic_solution"),Balance<1.e-4f&&FMath::Abs(P[0]-.25f)<1.e-4f&&FMath::Abs(Full-FMath::Sqrt(.75f))<1.e-4f);
+   TArray<CourseworkAirNetwork::FEdge> Narrow={{0,INDEX_NONE,.1f,1},{0,INDEX_NONE,1,-.5f}};
+   Solve(1,Narrow,P);Record(TEXT("small_aperture_limits_exchange_without_reversing_flow"),Narrow[0].Flow<0&&Narrow[1].Flow>0&&FMath::Abs(Narrow[0].Flow)<Full*.2f);
+   TArray<CourseworkAirNetwork::FEdge> Reverse={{0,INDEX_NONE,1,-.5f},{0,INDEX_NONE,1,1}};
+   Solve(1,Reverse,P);Record(TEXT("reversed_boundary_pressure_reverses_flow"),Reverse[0].Flow>0&&Reverse[1].Flow<0&&FMath::Abs(Reverse[0].Flow-Full)<1.e-4f);
+   TArray<CourseworkAirNetwork::FEdge> Chain={{0,INDEX_NONE,1,1},{1,INDEX_NONE,1,-.5f},{0,1,.2f}};
+   const float ChainBalance=Solve(2,Chain,P),Restricted=FMath::Abs(Chain[0].Flow);Chain[2].Conductance=3;
+   const float WideBalance=Solve(2,Chain,P);
+   Record(TEXT("partial_door_conductance_continuously_limits_multizone_flow"),ChainBalance<1.e-4f&&WideBalance<1.e-4f&&Restricted<FMath::Abs(Chain[0].Flow)*.4f);
+   TArray<CourseworkAirNetwork::FEdge> Isolated={{0,INDEX_NONE,1,1},{1,INDEX_NONE,1,-.5f}};
+   Solve(2,Isolated,P);Record(TEXT("closed_door_has_no_invented_net_throughflow"),FMath::Abs(Isolated[0].Flow)<1.e-4f&&FMath::Abs(Isolated[1].Flow)<1.e-4f);
+   Record(TEXT("effective_area_follows_drawn_slide_and_hinge_pose"),Aperture(0,40)==0&&Aperture(0,0)==0&&FMath::Abs(Aperture(.25f,0)-.25f)<1.e-6f&&Aperture(.25f,40)<Aperture(.5f,40)&&Aperture(.5f,40)<Aperture(1,40));
+   TArray<CourseworkAirNetwork::FEdge> DeadEnd={{0,INDEX_NONE,.8f,-.5f},{0,1,3},{0,2,3}};
+   Record(TEXT("single_opening_with_dead_end_rooms_conserves_mass"),Solve(4,DeadEnd,P)<1.e-5f&&FMath::Abs(DeadEnd[0].Flow)<1.e-5f&&FMath::Abs(DeadEnd[1].Flow)<1.e-5f);
+   DeadEnd.Add({0,INDEX_NONE,.8f,1});DeadEnd.Add({1,INDEX_NONE,.4f,-.5f});
+   Record(TEXT("asymmetric_openings_and_unanchored_room_converge"),Solve(4,DeadEnd,P)<1.e-5f&&FMath::Abs(DeadEnd[2].Flow)<1.e-5f&&P[3]==0);
+   DeadEnd.Add({4,5,.01f});Record(TEXT("sealed_connected_component_does_not_break_anchored_solver"),Solve(6,DeadEnd,P)<1.e-5f&&P[4]==0&&P[5]==0);
+  }
   Record(TEXT("room_inventory_includes_new_corner_windows"),GetRoomWindowCount(0)==4&&GetRoomWindowCount(2)==2&&GetRoomWindowCount(5)==1&&GetRoomWindowCount(1)==1&&GetRoomWindowCount(3)==1&&GetRoomWindowCount(4)==2&&GetRoomWindowCount(8)==2);
   Record(TEXT("corner_windows_in_dining_and_side_room"),GetRoomWindowCount(6)==0&&GetRoomWindowCount(7)==2&&GetRoomWindowCount(9)==1);
   Record(TEXT("ribbons_hidden_by_default"),!IsAirflowDisplayed());Record(TEXT("leaf_materials_available"),Ventilation->GetPlantCount()>=3);Record(TEXT("curtains_ready_and_pinned_when_closed"),Ventilation->GetCurtainCount()>0&&Ventilation->CheckCurtains(false));Record(TEXT("closed_windows_no_leaf_motion"),Ventilation->GetMaxLeafMotion()<.001f);return;
@@ -86,9 +109,9 @@ void ACourseworkHUD::TickVentilationAcceptance()
  {
  case 0:Record(TEXT("all_window_closed_poses_exact"),Ventilation->CheckClosedPoses());Record(TEXT("comfort_header_pointer"),Click(690,43)&&PanelMode==9);Record(TEXT("ventilation_subpage_pointer"),Click(150,270)&&GetComfortPage()==1);Overlay->ShowLightingRoom(0);Shot(TEXT("Ventilation_panel_closed.png"));break;
  case 1:Record(TEXT("room_open_pointer"),Click(425,580)&&GetRoomOpenWindowCount(0)==4);Record(TEXT("show_airflow_pointer"),Click(1200,580)&&IsAirflowDisplayed());LivingSide(false);break;
- case 2:Record(TEXT("single_side_exchange_without_false_crossflow"),GetRoomVentilation(0)>.15f&&!HasRoomCrossFlow(0));Record(TEXT("single_side_paths_respect_solids"),Ventilation->GetPathCount()>0&&Ventilation->CheckPathsClear());Shot(TEXT("Ventilation_panel_local.png"));break;
+ case 2:Record(TEXT("single_side_exchange_without_false_crossflow"),GetRoomVentilation(0)>.15f&&!HasRoomCrossFlow(0));Record(TEXT("single_side_paths_respect_solids"),Ventilation->GetPathCount()>0&&Ventilation->CheckPathsClear());R.LocalResponse=Ventilation->GetResponseSample();Shot(TEXT("Ventilation_panel_local.png"));break;
  case 3:SetRoomWindows(0,true);SetRoomWindows(2,true);break;
- case 4:Record(TEXT("opposed_windows_form_crossflow"),HasRoomCrossFlow(0)&&HasRoomCrossFlow(2)&&Ventilation->GetCrossPathCount()>0);Record(TEXT("pressure_balanced_and_high_to_low"),Ventilation->CheckFlowDirections());Record(TEXT("crossflow_stronger_than_local_exchange"),GetRoomVentilation(0)>.6f);Record(TEXT("crossflow_routes_do_not_cross_solids"),Ventilation->CheckPathsClear());Record(TEXT("open_windows_move_nearby_leaves"),Ventilation->GetMaxLeafMotion()>.01f);Record(TEXT("plant_pots_and_stems_do_not_translate"),Ventilation->CheckPlantTransforms());Shot(TEXT("Ventilation_panel_cross.png"));break;
+ case 4:{Record(TEXT("opposed_windows_form_crossflow"),HasRoomCrossFlow(0)&&HasRoomCrossFlow(2)&&Ventilation->GetCrossPathCount()>0);Record(TEXT("pressure_balanced_and_high_to_low"),Ventilation->CheckFlowDirections());Record(TEXT("crossflow_stronger_than_local_exchange"),GetRoomVentilation(0)>.6f);Record(TEXT("crossflow_routes_do_not_cross_solids"),Ventilation->CheckPathsClear());Record(TEXT("open_windows_move_nearby_leaves"),Ventilation->GetMaxLeafMotion()>.01f);Record(TEXT("plant_pots_and_stems_do_not_translate"),Ventilation->CheckPlantTransforms());const FVector Cross=Ventilation->GetResponseSample();Record(TEXT("computed_exchange_drives_stronger_wind_audio_and_curtains"),Cross.X>R.LocalResponse.X*2&&Cross.Y>R.LocalResponse.Y*1.3&&Cross.Z>R.LocalResponse.Z*1.3);UE_LOG(LogTemp,Display,TEXT("VENTILATION_RESPONSE local=%s cross=%s"),*R.LocalResponse.ToString(),*Cross.ToString());Shot(TEXT("Ventilation_panel_cross.png"));break;}
  case 5:SetPanel(0);ObserveVentilation(0);Player->TeleportTo(FVector(-2050,9660,151.5),FRotator::ZeroRotator,false,false);PC->PlayerCameraManager->UpdateCamera(0);{FVector Eye;FRotator View;PC->GetPlayerViewPoint(Eye,View);PC->SetControlRotation((Ventilation->GetFlowFocus()-Eye).Rotation());UE_LOG(LogTemp,Display,TEXT("VENTILATION_CAMERA eye=%s focus=%s"),*Eye.ToString(),*Ventilation->GetFlowFocus().ToString());}FFileHelper::SaveStringToFile(Ventilation->GetRenderDiagnostics(),*(FPaths::ProjectSavedDir()/TEXT("VentilationRendering.txt")));Shot(TEXT("Ventilation_cross_scene.png"));break;
  case 6:Record(TEXT("world_projected_trails_drawn"),Ventilation->CheckAirflowDrawing());LivingSide(false);break;
  case 7:Record(TEXT("curtain_hems_move_with_open_windows"),Ventilation->CheckCurtains(true));Record(TEXT("closing_outlet_removes_crossflow"),!HasRoomCrossFlow(0)&&!HasRoomCrossFlow(2)&&GetRoomVentilation(0)<.4f);CloseAllWindows();break;

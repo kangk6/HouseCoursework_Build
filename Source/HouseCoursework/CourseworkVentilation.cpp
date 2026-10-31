@@ -1,5 +1,6 @@
 #include "CourseworkVentilation.h"
 #include "CourseworkRooms.h"
+#include "CourseworkAirNetwork.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/AudioComponent.h"
@@ -71,7 +72,7 @@ void ACourseworkVentilation::BeginPlay()
     auto* Part=FindAsset(S.Part);if(!Part)continue;
     FWindow W;W.FixedFrame=Fixed;W.FixedTransform=Transform;W.Room=Room;const auto& R=CourseworkRooms::Get(Room);W.LocationLabel=FString::Printf(TEXT("%s · %s窗户"),R.Floor,R.Name);if(Room==SideRoom)W.LocationLabel=TEXT("二楼 · 侧室窗户");W.Center=Transform.TransformPosition(S.Center);W.Travel=S.Travel;W.Axis=S.Axis;W.Angle=S.Angle;W.Extent=S.Extent;W.Area=4*S.Extent.X*S.Extent.Z/10000.f; if(!S.Travel.IsNearlyZero()){const float Size=S.Travel.Z!=0?2*S.Extent.Z:2*S.Extent.X;W.Area*=FMath::Min(1.f,float(S.Travel.Size())/Size);}W.Inward=-Transform.TransformVectorNoScale(FVector::YAxisVector).GetSafeNormal();
     auto* Hinge=NewObject<USceneComponent>(this);AddInstanceComponent(Hinge);Hinge->SetupAttachment(GetRootComponent());Hinge->SetMobility(EComponentMobility::Movable);Hinge->RegisterComponent();Hinge->SetWorldTransform(Transform);Hinge->AddLocalOffset(S.Pivot);W.Hinge=Hinge;W.Closed=Hinge->GetRelativeTransform();
-    if(S.Angle>0){W.Center=Transform.TransformPosition(S.Center-FVector(0,0,S.Extent.Z-3));W.Area*=.23f;}
+    if(S.Angle>0){W.Center=Transform.TransformPosition(S.Center-FVector(0,0,S.Extent.Z-3));W.Area*=.23f/FMath::Sin(FMath::DegreesToRadians(S.Angle));}
     auto* Sash=NewObject<UStaticMeshComponent>(this);AddInstanceComponent(Sash);Sash->SetupAttachment(Hinge);Sash->SetMobility(EComponentMobility::Movable);Sash->SetStaticMesh(Part);Sash->SetRelativeLocation(-S.Pivot);
     for(int32 I=0;I<Original->GetNumMaterials();++I)Sash->SetMaterial(I,Original->GetMaterial(I));
     Sash->SetCollisionProfileName(TEXT("BlockAllDynamic"));Sash->SetCanEverAffectNavigation(false);Sash->RegisterComponent();W.Sash=Sash;
@@ -137,16 +138,18 @@ void ACourseworkVentilation::Tick(float Dt)
   if(auto* H=W.Hinge.Get()){FTransform T=W.Closed;const float A=FMath::SmoothStep(0.f,1.f,W.Amount);T.SetLocation(W.Closed.GetLocation()+W.Closed.TransformVector(W.Travel*A));if(W.Angle!=0)T.SetRotation(W.Closed.GetRotation()*FQuat(W.Axis,FMath::DegreesToRadians(W.Angle*A)));H->SetRelativeTransform(T);}
   if(auto* A=W.Audio.Get())
   {
-   const float Gain=bSuspended?0:W.Amount*.24f;
+   W.AirResponse=FMath::FInterpTo(W.AirResponse,bSuspended?0.f:CourseworkAirNetwork::Response(W.Exchange),Dt,2.f);
+   const float Gain=W.AirResponse*.26f;
    A->SetVolumeMultiplier(Gain);if(Gain>.002f&&!A->IsPlaying())A->Play();else if(Gain<=.002f&&A->IsPlaying())A->Stop();
   }
  }
  for(auto& P:Plants){P.Amount=FMath::FInterpTo(P.Amount,bSuspended?0.f:P.Target,Dt,3.f);if(auto* M=P.Material.Get())M->SetScalarParameterValue(TEXT("CourseworkWindAmount"),P.Amount);}
  for(auto& C:Curtains){C.Amount=FMath::FInterpTo(C.Amount,bSuspended?0.f:C.Target,Dt,1.7f);if(C.Target==0&&C.Amount<.01f)C.Amount=0;if(auto* M=C.Material.Get())M->SetScalarParameterValue(TEXT("CurtainWindAmount"),C.Amount);}
  uint64 State=bSuspended?1:0;
- for(const auto& W:Windows)State=State*3+(W.Amount>.999f?2:W.Amount>.15f?1:0);
+ auto OpeningState=[](float Amount){return Amount<=0.f?0:Amount>=1.f?22:1+FMath::FloorToInt(Amount*20);};
+ for(const auto& W:Windows)State=State*23+OpeningState(W.Amount);
  for(auto& D:Doors)if(auto* M=D.Mesh.Get())
- {const auto T=M->GetRelativeTransform();D.Amount=FMath::Clamp(FMath::Max(float(FMath::RadiansToDegrees(T.GetRotation().AngularDistance(D.Closed.GetRotation())))/90.f,float(FVector::Dist(T.GetLocation(),D.Closed.GetLocation()))/80.f),0.f,1.f);State=State*3+(D.Amount>.95f?2:D.Amount>.05f?1:0);}
+ {const auto T=M->GetRelativeTransform();D.Amount=FMath::Clamp(FMath::Max(float(FMath::RadiansToDegrees(T.GetRotation().AngularDistance(D.Closed.GetRotation())))/90.f,float(FVector::Dist(T.GetLocation(),D.Closed.GetLocation()))/80.f),0.f,1.f);State=State*23+OpeningState(D.Amount);}
  RebuildElapsed+=Dt;if(State!=LastState&&RebuildElapsed>.2f){LastState=State;RebuildElapsed=0;RebuildFlow();}
  for(int32 I=0;I<RoomStrength.Num();++I)RoomStrength[I]=FMath::FInterpTo(RoomStrength[I],RoomTarget[I],Dt,3.f);
  VisualWeight=FMath::FInterpTo(VisualWeight,IsDisplayed()?1.f:0.f,Dt,5.f);
@@ -185,34 +188,34 @@ TArray<FVector> ACourseworkVentilation::FindAirPath(FVector Start,FVector End)co
 void ACourseworkVentilation::RebuildFlow()
 {
 
- Paths.Empty();RoomTarget.Init(0,FlowRoomCount);CrossRooms.Init(false,FlowRoomCount);for(auto& P:Plants)P.Target=0;PressureResidual=0;for(auto& C:Curtains)C.Target=0;if(bSuspended)return;
+ Paths.Empty();RoomTarget.Init(0,FlowRoomCount);CrossRooms.Init(false,FlowRoomCount);for(auto& W:Windows){W.Flow=0;W.Exchange=0;}for(auto& P:Plants)P.Target=0;PressureResidual=0;for(auto& C:Curtains)C.Target=0;if(bSuspended)return;
  // A steady relative-pressure network, not a velocity-field/CFD solver. Exterior
  // east->west wind: windward +1, leeward -.5, side faces -.25. Interior pressure
  // is solved from conservation at each room, including both real exterior doors.
  struct FLink{int32 A,B;FVector Point;float G=3,Flow=0;bool Door=false;};
- struct FOpening{int32 Room;FVector Center,Inward;float G,Pressure,Flow=0;};
+ struct FOpening{int32 Room;FVector Center,Inward;float G,Pressure,Flow=0;int32 Window=INDEX_NONE;};
  // The ground-floor passage runs beside the stair enclosure. The former
  // placeholder at x=-2110 lay inside that enclosure rather than in the opening.
  TArray<FLink> Links={{0,2,FVector(-2000,9660,245)},{0,7,FVector(-1990,10025,245)}};
  TArray<FOpening> Openings;
  auto Cp=[](FVector N){const float D=FVector::DotProduct(N,FVector(-1,0,0));return D>.5f?1.f:D<-.5f?-.5f:-.25f;};
- for(const auto& W:Windows)if(W.Amount>.15f){const float Area=FMath::Clamp(W.Area,.03f,4.f);Openings.Add({W.Room,W.Center,W.Inward,W.Amount*Area,Cp(W.Inward)});RoomTarget[W.Room]=FMath::Max(RoomTarget[W.Room],.26f*W.Amount);}
- for(const auto& D:Doors)if(D.Amount>.95f)
+ for(int32 I=0;I<Windows.Num();++I){const auto& W=Windows[I];const float Open=CourseworkAirNetwork::Aperture(FMath::SmoothStep(0.f,1.f,W.Amount),W.Angle);if(Open>.001f){const float Area=FMath::Clamp(W.Area,.03f,4.f)*Open;Openings.Add({W.Room,W.Center,W.Inward,Area,Cp(W.Inward),0,I});RoomTarget[W.Room]=FMath::Max(RoomTarget[W.Room],.26f*Open);}}
+ for(const auto& D:Doors)if(D.Amount>.01f)
  {
-  if(D.B>=0){FVector P=D.Portal;P.Z=P.Z<300?245:465;Links.Add({D.A,D.B,P,3,0,true});}
-  else {const FVector N=D.Portal.Y<9800?FVector(0,1,0):FVector(0,-1,0);Openings.Add({D.A,D.Portal,N,1.4f*D.Amount,Cp(N)});RoomTarget[D.A]=FMath::Max(RoomTarget[D.A],.26f*D.Amount);}
+  const float Open=CourseworkAirNetwork::Aperture(D.Amount,90.f);
+  if(D.B>=0){FVector P=D.Portal;P.Z=P.Z<300?245:465;Links.Add({D.A,D.B,P,3*Open,0,true});}
+  else {const FVector N=D.Portal.Y<9800?FVector(0,1,0):FVector(0,-1,0);Openings.Add({D.A,D.Portal,N,1.4f*Open,Cp(N)});RoomTarget[D.A]=FMath::Max(RoomTarget[D.A],.26f*Open);}
  }
- TArray<float> Pressure;Pressure.Init(0,FlowRoomCount);
- for(int32 Iter=0;Iter<512;++Iter)for(int32 R=0;R<Pressure.Num();++R)
- {
-  float Sum=0,G=0;for(const auto& O:Openings)if(O.Room==R){Sum+=O.G*O.Pressure;G+=O.G;}
-  for(const auto& L:Links){const int32 N=L.A==R?L.B:L.B==R?L.A:-1;if(N>=0){Sum+=L.G*Pressure[N];G+=L.G;}}
-  if(G>0)Pressure[R]=Sum/G;
- }
- for(auto& O:Openings)O.Flow=O.G*(O.Pressure-Pressure[O.Room]);
+ TArray<CourseworkAirNetwork::FEdge> Edges;
+ for(const auto& O:Openings)Edges.Add({O.Room,INDEX_NONE,O.G,O.Pressure});
+ for(const auto& L:Links)Edges.Add({L.A,L.B,L.G});
+ TArray<float> Pressure;PressureResidual=CourseworkAirNetwork::Solve(FlowRoomCount,Edges,Pressure);
+ for(int32 I=0;I<Openings.Num();++I){auto& O=Openings[I];O.Flow=-Edges[I].Flow;if(Windows.IsValidIndex(O.Window)){auto& W=Windows[O.Window];W.Flow=O.Flow;
+  // Unresolved single-sided turbulence has zero NET flux; keep this weak local
+  // exchange separate from conservation, instead of inventing a through-flow.
+  W.Exchange=FMath::Abs(O.Flow)+.06f*O.G;}}
  for(const auto& O:Openings){FCollisionQueryParams Q(SCENE_QUERY_STAT(AirOpeningAudit),true);for(const auto& W:Windows)if(W.Proxy.IsValid())Q.AddIgnoredComponent(W.Proxy.Get());FHitResult Hit;GetWorld()->LineTraceSingleByChannel(Hit,O.Center-O.Inward*14,O.Center+O.Inward*16,ECC_Visibility,Q);UE_LOG(LogTemp,Display,TEXT("AIR_OPENING room=%d center=%s inward=%s flow=%.4f obstruction=%s/%s"),O.Room,*O.Center.ToCompactString(),*O.Inward.ToCompactString(),O.Flow,Hit.GetActor()?*Hit.GetActor()->GetName():TEXT("none"),Hit.GetComponent()?*Hit.GetComponent()->GetName():TEXT("none"));}
- for(auto& L:Links)L.Flow=L.G*(Pressure[L.A]-Pressure[L.B]);
- for(int32 R=0;R<Pressure.Num();++R){float Net=0;for(const auto& O:Openings)if(O.Room==R)Net+=O.Flow;for(const auto& L:Links){if(L.A==R)Net-=L.Flow;if(L.B==R)Net+=L.Flow;}PressureResidual=FMath::Max(PressureResidual,FMath::Abs(Net));}
+ for(int32 I=0;I<Links.Num();++I)Links[I].Flow=Edges[Openings.Num()+I].Flow;
  auto AddPath=[&](TArray<FVector> Points,int32 Room,bool Cross,float Inlet,float Outlet,float Flux=0.f)->bool
  {
   if(Points.Num()<2)return false;
@@ -224,7 +227,7 @@ void ACourseworkVentilation::RebuildFlow()
    bool Clear=SegmentClear(Smooth.Last(),Arc[0]);for(int32 N=1;N<Arc.Num();++N)Clear&=SegmentClear(Arc[N-1],Arc[N]);
    if(Clear)Smooth.Append(Arc);else Smooth.Add(C);
   }Smooth.Add(Points.Last());
-  FFlowPath P;P.Points=MoveTemp(Smooth);P.Room=Room;P.Cross=Cross;P.InletPressure=Inlet;P.OutletPressure=Outlet;P.Born=GetWorld()->GetTimeSeconds();
+  FFlowPath P;P.Points=MoveTemp(Smooth);P.Room=Room;P.Cross=Cross;P.InletPressure=Inlet;P.OutletPressure=Outlet;P.Born=GetWorld()->GetTimeSeconds();P.Flux=Flux;
   for(int32 I=1;I<P.Points.Num();++I){if(!SegmentClear(P.Points[I-1],P.Points[I]))return false;P.Length+=FVector::Dist(P.Points[I-1],P.Points[I]);}if(P.Length<15)return false;
   const int32 Count=Cross?FMath::Clamp(FMath::CeilToInt(Flux*10.f),2,6):2;
   for(int32 N=0;N<Count;++N){FVector Offset(0,0,(N%3-1)*4.f);for(int32 K=1;K<P.Points.Num();++K)if(!SegmentClear(P.Points[K-1]+Offset,P.Points[K]+Offset)){Offset=FVector::ZeroVector;break;}P.Offsets.Add(Offset);}
@@ -254,7 +257,7 @@ void ACourseworkVentilation::RebuildFlow()
    TArray<FVector> Points;bool Valid=true;
    for(int32 K=1;K<Stops.Num();++K){auto Leg=FindAirPath(Stops[K-1],Stops[K]);if(Leg.Num()<2){UE_LOG(LogTemp,Display,TEXT("AIR_ROUTE_BLOCKED leg=%d a=%s b=%s"),K,*Stops[K-1].ToCompactString(),*Stops[K].ToCompactString());Valid=false;break;}if(Points.Num())Leg.RemoveAt(0);Points.Append(Leg);}
    if(Valid&&AddPath(MoveTemp(Points),In.Room,true,In.Pressure,Out.Pressure,Flux))
-   {for(int32 R:Rooms){RoomTarget[R]=FMath::Max(RoomTarget[R],.85f);CrossRooms[R]=true;}
+   {for(int32 R:Rooms){RoomTarget[R]=FMath::Min(.95f,RoomTarget[R]+CourseworkAirNetwork::Response(Flux)*.7f);CrossRooms[R]=true;}
     OpeningRemaining[I]-=Flux;OpeningRemaining[J]-=Flux;for(int32 R=Out.Room;R!=In.Room;R=Parent[R])LinkRemaining[ParentLink[R]]-=Flux;
     UE_LOG(LogTemp,Display,TEXT("AIRFLOW_ROUTE inlet=%s outlet=%s pressure=%.3f->%.3f relative_flux=%.4f rooms=%d"),*In.Center.ToCompactString(),*Out.Center.ToCompactString(),In.Pressure,Out.Pressure,Flux,Rooms.Num());}
   }
@@ -270,9 +273,9 @@ void ACourseworkVentilation::RebuildFlow()
  for(const auto& L:Links){if(RoomTarget[L.A]>.15f)RoomTarget[L.B]=FMath::Max(RoomTarget[L.B],RoomTarget[L.A]*.25f);if(RoomTarget[L.B]>.15f)RoomTarget[L.A]=FMath::Max(RoomTarget[L.A],RoomTarget[L.B]*.25f);}
  for(auto& P:Plants)if(auto* M=P.Mesh.Get())for(const auto& W:Windows){if(W.Amount<.15f||FMath::Abs(W.Center.Z-M->Bounds.Origin.Z)>160)continue;const FVector Leaf=M->Bounds.Origin+FVector(0,0,M->Bounds.BoxExtent.Z*.45f);const float Distance=FVector::Dist(Leaf,W.Center);if(Distance>360||FVector::DotProduct(Leaf-W.Center,W.Inward)<0)continue;
  FCollisionQueryParams Q(SCENE_QUERY_STAT(LeafWindOcclusion),true);Q.AddIgnoredComponent(M);for(const auto& O:Windows)if(O.Proxy.IsValid())Q.AddIgnoredComponent(O.Proxy.Get());FHitResult Hit;
- if(!GetWorld()->LineTraceSingleByChannel(Hit,W.Center+W.Inward*20,Leaf,ECC_Visibility,Q))P.Target=FMath::Max(P.Target,W.Amount*.75f*FMath::Clamp(1-Distance/400.f,0.f,1.f));}
+ if(!GetWorld()->LineTraceSingleByChannel(Hit,W.Center+W.Inward*20,Leaf,ECC_Visibility,Q))P.Target=FMath::Max(P.Target,CourseworkAirNetwork::Response(W.Exchange)*FMath::Clamp(1-Distance/400.f,0.f,1.f));}
  for(auto& C:Curtains)if(auto* Mesh=C.Mesh.Get())for(const auto& W:Windows){const auto P=Mesh->Bounds.Origin;const auto D=P-W.Center;const float Along=FVector::DotProduct(D,W.Inward);const float Lateral=(D-W.Inward*Along).Size();if(W.Amount<.15f||Along< -12||Along>90||Lateral>190)continue;
- const float Strength=W.Amount*FMath::Clamp(1-Lateral/240.f,0.f,1.f);const float Target=Strength*3.f;if(Target>C.Target){C.Target=Target;if(auto* M=C.Material.Get()){float Direction=1;for(const auto& O:Openings)if(O.Center.Equals(W.Center,1.f)&&O.Flow<-.008f)Direction=-1;M->SetScalarParameterValue(TEXT("CurtainDX"),Direction*W.Inward.X);M->SetScalarParameterValue(TEXT("CurtainDY"),Direction*W.Inward.Y);}}
+ const float Strength=CourseworkAirNetwork::Response(W.Exchange)*FMath::Clamp(1-Lateral/240.f,0.f,1.f);const bool Sheer=C.Original.IsValid()&&C.Original->GetBlendMode()==BLEND_Translucent;const float Target=Strength*(Sheer?3.f:1.6f);if(Target>C.Target){C.Target=Target;if(auto* M=C.Material.Get()){const float Direction=W.Flow<-.008f?-1.f:1.f;M->SetScalarParameterValue(TEXT("CurtainDX"),Direction*W.Inward.X);M->SetScalarParameterValue(TEXT("CurtainDY"),Direction*W.Inward.Y);}}
  }
  if(IsDisplayed()){for(const auto& P:Paths)if(P.Cross){FString Line;for(const auto& V:P.Points)Line+=V.ToCompactString()+TEXT(";");UE_LOG(LogTemp,Verbose,TEXT("VENTILATION_PATH %s"),*Line);}}
  UE_LOG(LogTemp,Display,TEXT("VENTILATION_FLOW open=%d exterior_doors=%d paths=%d cross=%d balance_error=%.6f"),GetOpenCount(),GetOpenExteriorDoorCount(),Paths.Num(),GetCrossPathCount(),PressureResidual);
@@ -320,7 +323,15 @@ FVector ACourseworkVentilation::GetFlowFocus()const
 FString ACourseworkVentilation::GetRenderDiagnostics()const
 {
  FString Result=FString::Printf(TEXT("backend=world-projected translucent trails with view occlusion; relative-pressure network; exterior_wind=(-1,0,0); exterior_doors=%d; residual=%.6f; display=%d segments=%d focus=%s"),GetOpenExteriorDoorCount(),PressureResidual,IsDisplayed(),LastDrawSegments,*GetFlowFocus().ToString());
- for(const auto& P:Paths){Result+=FString::Printf(TEXT("\nlength=%.2f cross=%d room=%d pressure=%.3f->%.3f"),P.Length,P.Cross,P.Room,P.InletPressure,P.OutletPressure);for(const auto& V:P.Points)Result+=TEXT(" ")+V.ToCompactString();}return Result;
+ for(const auto& W:Windows)Result+=FString::Printf(TEXT("\nwindow room=%d pose=%.3f net_flux=%.5f exchange=%.5f response=%.4f"),W.Room,W.Amount,W.Flow,W.Exchange,W.AirResponse);
+ for(const auto& P:Paths){Result+=FString::Printf(TEXT("\nlength=%.2f cross=%d room=%d pressure=%.3f->%.3f flux=%.5f"),P.Length,P.Cross,P.Room,P.InletPressure,P.OutletPressure,P.Flux);for(const auto& V:P.Points)Result+=TEXT(" ")+V.ToCompactString();}return Result;
+}
+FVector ACourseworkVentilation::GetResponseSample()const
+{
+ FVector Result=FVector::ZeroVector;
+ for(const auto& W:Windows){Result.X=FMath::Max(Result.X,double(W.Exchange));if(auto* A=W.Audio.Get())Result.Y=FMath::Max(Result.Y,double(A->VolumeMultiplier));}
+ for(const auto& C:Curtains)Result.Z=FMath::Max(Result.Z,double(C.Amount));
+ return Result;
 }
 
 void ACourseworkVentilation::DrawAirflow(UCanvas* Canvas,APlayerController* PC)
@@ -333,7 +344,7 @@ void ACourseworkVentilation::DrawAirflow(UCanvas* Canvas,APlayerController* PC)
  TArray<FCanvasUVTri> Triangles;
  const float Time=GetWorld()->GetTimeSeconds();
  for(int32 Index=0;Index<Paths.Num();++Index){const auto& P=Paths[Index];const float Strength=GetRoomStrength(P.Room),Fade=FMath::SmoothStep(0.f,.4f,Time-P.Born);if(Strength<.01f)continue;
- const int32 Count=P.Offsets.Num();for(int32 N=0;N<Count;++N){const float Head=FMath::Fmod(Time*(P.Cross?78.f:32.f)+P.Length*(N+.23f*Index)/Count,P.Length+64.f);
+ const int32 Count=P.Offsets.Num();for(int32 N=0;N<Count;++N){const float Speed=P.Cross?FMath::Lerp(36.f,100.f,CourseworkAirNetwork::Response(P.Flux)):24.f;const float Head=FMath::Fmod(Time*Speed+P.Length*(N+.23f*Index)/Count,P.Length+64.f);
  for(int32 K=0;K<12;++K){const float T=float(K)/12,D=Head-(1-T)*52.f,D2=D+52.f/12;if(D<0||D2>P.Length)continue;const FVector A=Along(P,D)+P.Offsets[N],B=Along(P,D2)+P.Offsets[N],Mid=(A+B)*.5f;FVector2D ScreenA,ScreenB;
  const float Distance=FVector::Dist(Eye,Mid);if(Distance<90.f)continue;
  if(!PC->ProjectWorldLocationToScreen(A,ScreenA)||!PC->ProjectWorldLocationToScreen(B,ScreenB))continue;

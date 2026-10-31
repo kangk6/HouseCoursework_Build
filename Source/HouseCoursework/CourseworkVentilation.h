@@ -51,6 +51,7 @@ public:
     bool CheckAirflowDrawing()const;
     FVector GetFlowFocus()const;
     FString GetRenderDiagnostics()const;
+    FVector GetResponseSample()const;
     void DrawAirflow(UCanvas* Canvas,APlayerController* Controller);
     bool CheckClosedPoses()const;
     bool CheckWindowGeometry(int32 Index,bool Open)const;
@@ -75,11 +76,11 @@ private:
         FString LocationLabel;
         FTransform Closed;
         int32 Room=0;
-        float Target=0,Amount=0;
+        float Target=0,Amount=0,Flow=0,Exchange=0,AirResponse=0;
     };
     struct FOriginal {TWeakObjectPtr<UStaticMeshComponent> Mesh;bool Visible,Hidden;ECollisionEnabled::Type Collision;};
     struct FDoor {TWeakObjectPtr<UStaticMeshComponent> Mesh;FTransform Closed;FVector Portal;int32 A,B;float Amount=0;};
-    struct FFlowPath {TArray<FVector> Points,Offsets;int32 Room=0;bool Cross=false;float Length=0,Born=0,InletPressure=0,OutletPressure=0;};
+    struct FFlowPath {TArray<FVector> Points,Offsets;int32 Room=0;bool Cross=false;float Length=0,Born=0,InletPressure=0,OutletPressure=0,Flux=0;};
     struct FPlant {TWeakObjectPtr<UStaticMeshComponent> Mesh;TWeakObjectPtr<UMaterialInterface> Original;TWeakObjectPtr<UMaterialInstanceDynamic> Material;FTransform Transform;int32 Slot=0;float Target=0,Amount=0;};
     TArray<FPlant> Plants;
     TArray<FPlant> Curtains;
