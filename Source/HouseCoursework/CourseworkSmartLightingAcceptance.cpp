@@ -91,7 +91,7 @@ void ACourseworkHUD::TickSmartLightingAcceptance()
     case 18:SetPanel(0);SetSmartLightingScene(1);Place(FVector(-2260,9455,410),FVector(-2114,9470,335));break;
     case 19:
         Record(TEXT("bedroom_exit_is_not_misclassified_as_hall"),SmartPlayerZone==1);
-        Record(TEXT("occupied_bedroom_has_bedside_guide"),GetSmartFixtureLevel(TEXT("BP_Lamp_C2_ON2"))>=.21f);
+        Record(TEXT("occupied_bedroom_has_bedside_guide"),FMath::Max(GetSmartFixtureLevel(TEXT("BP_Lamp_C2_ON2")),GetSmartFixtureLevel(TEXT("BP_Lamp_C2_ON_2")))>=.21f);
         Record(TEXT("bedroom_ceiling_stays_asleep"),GetSmartFixtureLevel(TEXT("SM_Lamp_D_6"))<.001f);
         {bool Lit=false,Owners=true;for(const auto& F:SmartPathFills)if(auto* L=F.Light.Get()){Owners&=!L->GetOwner()->IsHidden();if(F.Room==1&&L->Intensity>1)Lit=true;}Record(TEXT("bedroom_has_rendered_path_fill"),Lit);Record(TEXT("path_fill_owners_are_visible"),Owners);}
         Shot(TEXT("Smart_bedroom_exit.png"));break;

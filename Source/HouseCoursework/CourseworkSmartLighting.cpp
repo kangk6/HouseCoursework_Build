@@ -1,6 +1,7 @@
 #include "CourseworkHUD.h"
 #include "CourseworkDaylight.h"
 #include "CourseworkOverlay.h"
+#include "CourseworkNightGuidance.h"
 #include "Components/LightComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -78,6 +79,7 @@ bool ACourseworkHUD::SetSmartLightingScene(int32 Scene)
         for(auto& Light:SmartStairFills)if(Light.IsValid()){Light->SetIntensity(0);Light->SetVisibility(false);}
         for(auto& Level:SmartStairLevels)Level=0;
         bSmartReadingOccupied=false;SmartReadingUntil=0;
+        SmartNightHeading=FVector::ZeroVector;SmartNightPreferredFixture=NAME_None;bSmartNightWalking=false;
         // Restore the saved/manual baseline, not a snapshot of automatic outputs.
         bApplyingLightingSave=true;
         for(int32 I=0;I<CourseworkRooms::Count;++I)SetRoomLighting(I,RoomLightOn[I],RoomBrightness[I]);
@@ -145,6 +147,7 @@ bool ACourseworkHUD::SetSmartLightingScene(int32 Scene)
     {Add(Light.Component->GetOwner()->GetFName(),Light.Room);SmartOriginalColors.Add(Light.Component.Get(),Light.Component->GetLightColor());}
     for(const auto& Glow:ControlledGlows)if(Glow.Mesh.IsValid())Add(Glow.Mesh->GetOwner()->GetFName(),Glow.Room);
     SmartLightingScene=Scene;
+    SmartNightStartedAt=GetWorld()->GetTimeSeconds();
     TickSmartLighting(0);
     if(Overlay)Overlay->InvalidateLayoutAndVolatility();
     UE_LOG(LogTemp,Display,TEXT("SMART_SCENE mode=%d fixtures=%d"),Scene,SmartFixtures.Num());
@@ -170,37 +173,13 @@ void ACourseworkHUD::TickSmartLighting(float Dt)
     const bool Dark=NeedsNightLighting();
     // The original actor's origin is at the feet; zone heights use pawn centres.
     const int32 ResidentZone=OriginalResident.IsValid()?SmartZoneAt(GetResidentPosition()):INDEX_NONE;
-    if(SmartLightingScene==1&&Dark)
-    {
-        if(SmartPlayerZone!=INDEX_NONE)SmartRoomUntil.Add(SmartPlayerZone,Now+6);
-        bool DoorApproach=false;
-        for(const auto& Pair:ClosedTransforms)if(auto* Component=Cast<UStaticMeshComponent>(Pair.Key.Get()))
-        {
-            const FString Name=Component->GetOwner()->GetName();
-            if((Name==TEXT("BP_Door_Inside_A3_8")||Name==TEXT("BP_Door_Inside_A5_14"))&&FVector::Dist2D(Player,Component->Bounds.Origin)<145)DoorApproach=true;
-        }
-        if(SmartPlayerZone==8||DoorApproach||SmartPlayerZone==6)
-        {
-            if(Player.Z>210){SmartTrailUntil.Add(UpperHall,Now+6);SmartTrailUntil.Add(Landing,Now+6);SmartTrailUntil.Add(UpperWall,Now+6);SmartTrailUntil.Add(TEXT("PointLight15"),Now+6);}
-            if(Player.Z<360)SmartTrailUntil.Add(LowerHall,Now+6);
-            if(Player.X< -2100&&Player.Y>10040)SmartTrailUntil.Add(TEXT("PointLight12"),Now+6);
-        }
-        if(SmartPlayerZone==6)SmartTrailUntil.Add(UpperBath,Now+6);
-        if(SmartPlayerZone==5)for(const auto& Pair:SmartFixtures)if(Pair.Value.Room==5)SmartTrailUntil.Add(Pair.Key,Now+6);
-    }
+    if(SmartLightingScene==1&&Dark)UpdateNightGuidance(Dt,Player,Now);
     int32 ActivePathFills=0;
     for(auto& Fill:SmartPathFills)if(auto* Light=Fill.Light.Get())
     {
         const FVector Source=Light->GetComponentLocation();
-        if(SmartLightingScene==1&&Dark&&FMath::Abs(Player.Z-Source.Z)<105&&FVector::Dist2D(Player,Source)<320)
-        {
-            FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(NightPathPresence),true,PC->GetPawn());
-            // Check the walking space, rather than seeing through a closed
-            // bedroom door or sensing someone on the floor below.
-            if(!GetWorld()->LineTraceSingleByChannel(Hit,Player-FVector(0,0,30),Source+FVector(0,0,20),ECC_Visibility,Query))Fill.Until=Now+6;
-        }
         const float Target=SmartLightingScene==1&&Dark&&!SmartManualRooms.Contains(Fill.Room)&&Fill.Until>Now?1.f:0.f;
-        Fill.Level=SmartManualRooms.Contains(Fill.Room)?0:FMath::FInterpConstantTo(Fill.Level,Target,Dt,1.2f);
+        Fill.Level=SmartManualRooms.Contains(Fill.Room)?0:CourseworkNightGuidance::Fade(Fill.Level,Target,Dt,true);
         const float Intensity=6.f*Fill.Level;
         if(!FMath::IsNearlyEqual(Light->Intensity,Intensity,.0001f))Light->SetIntensity(Intensity);
         if(Light->IsVisible()!=(Intensity>.0001f))Light->SetVisibility(Intensity>.0001f);
@@ -211,10 +190,9 @@ void ACourseworkHUD::TickSmartLighting(float Dt)
     for(int32 I=0;I<SmartStairFills.Num();++I)if(auto* Light=SmartStairFills[I].Get())
     {
         const FName Key(*FString::Printf(TEXT("stair_bounce_%d"),I));
-        if(SmartLightingScene==1&&Dark&&SmartPlayerZone==8&&FVector::Dist(Player,Light->GetComponentLocation())<310)SmartTrailUntil.Add(Key,Now+6);
         const bool ManualHall=SmartManualRooms.Contains(8);
         const float Target=SmartLightingScene==1&&Dark&&!ManualHall&&SmartTrailUntil.FindRef(Key)>Now?1.f:0.f;
-        SmartStairLevels[I]=FMath::FInterpConstantTo(SmartStairLevels[I],Target,Dt,1.2f);
+        SmartStairLevels[I]=CourseworkNightGuidance::Fade(SmartStairLevels[I],Target,Dt,true);
         const float Intensity=8.f*SmartStairLevels[I];
         if(!FMath::IsNearlyEqual(Light->Intensity,Intensity,.0001f))Light->SetIntensity(Intensity);
         if(Light->IsVisible()!=(Intensity>.0001f))Light->SetVisibility(Intensity>.0001f);
@@ -246,12 +224,13 @@ void ACourseworkHUD::TickSmartLighting(float Dt)
             if(Dark&&SmartRoomUntil.FindRef(S.Room)>Now)
             {
                 const bool Ceiling=Pair.Key==FName(TEXT("SM_Lamp_D_6"))||Pair.Key==FName(TEXT("SM_Lamp_D2"))||Pair.Key==FName(TEXT("SM_Lamp_B1_2"));
-                if(S.Room!=8)Target=FMath::Max(Target,Ceiling?0.f:.22f);
+                const bool Auxiliary=Pair.Key.ToString().StartsWith(TEXT("PointLight"))||Pair.Key.ToString().StartsWith(TEXT("SpotLight"));
+                if(S.Room!=8&&Auxiliary&&!Ceiling)Target=FMath::Max(Target,.08f);
             }
             if(Dark&&SmartTrailUntil.FindRef(Pair.Key)>Now)
             {
                 const bool IndirectFill=Pair.Key==FName(TEXT("PointLight12"))||Pair.Key==FName(TEXT("PointLight15"));
-                Target=FMath::Max(Target,IndirectFill?.42f:.32f);
+                Target=FMath::Max(Target,IndirectFill?.28f:S.Room==8?.32f:.22f);
             }
         }
         else if(S.Room==4)
@@ -264,7 +243,8 @@ void ACourseworkHUD::TickSmartLighting(float Dt)
         if(const auto* Override=SmartFixtureOverrides.Find(Pair.Key))Target=*Override;
         S.Target=Target;
         // Fixed-rate fade avoids near-zero lights staying visible indefinitely.
-        S.Level=SmartManualRooms.Contains(S.Room)?Target:FMath::FInterpConstantTo(S.Level,Target,Dt,.65f);
+        const bool GentleNight=SmartLightingScene==1&&Now-SmartNightStartedAt>2&&S.Level<=.4f&&Target<=.4f;
+        S.Level=SmartManualRooms.Contains(S.Room)?Target:FMath::FInterpConstantTo(S.Level,Target,Dt,GentleNight?(Target>S.Level?1.f:.16f):.65f);
     }
     ApplySmartLighting();
 }

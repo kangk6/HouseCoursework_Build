@@ -1,7 +1,7 @@
 ﻿param(
     [string]$GameRoot='D:\HouseCoursework_Team\Artifacts\ClockFoundation\Windows',
     [string]$EvidenceRoot='D:\HouseCoursework_Team\Saved\Acceptance\ClockFoundation',
-    [ValidateSet('ventilation_polish','lamp_glare','weather_exterior','rain_polish','rain_profile','rain_brightness','rain','linkage','interaction','fixture','household_weather','clock','daylight','environment_regression','smart_lighting','ventilation','energy','solar','ui_transitions','daylight_sweep','dial','startup','day_cycle','drill_restore','evacuation','evacuation_upper')][string]$Mode='clock',
+    [ValidateSet('night_guidance','ventilation_polish','lamp_glare','weather_exterior','rain_polish','rain_profile','rain_brightness','rain','linkage','interaction','fixture','household_weather','clock','daylight','environment_regression','smart_lighting','ventilation','energy','solar','ui_transitions','daylight_sweep','dial','startup','day_cycle','drill_restore','evacuation','evacuation_upper')][string]$Mode='clock',
     [int]$Height=720,
     [string[]]$ExtraArguments=@()
 )
@@ -13,6 +13,7 @@ $names.day_cycle='DayCycleAcceptance.json';$names.drill_restore='DrillRestoreAcc
 $names.weather_exterior='WeatherExterior.json';$names.rain_polish='RainPolish.json';$names.rain_profile='RainProfile.json';$names.rain_brightness='RainBrightness.json';$names.rain='RainAcceptance.json';$names.linkage='LinkageAcceptance.json';$names.interaction='InteractionAcceptance.json';$names.fixture='FixtureAcceptance.json';$names.solar='SolarAcceptance.json';$names.household_weather='HouseholdWeatherAcceptance.json'
 $names.lamp_glare='LampGlare.json'
 $names.ventilation_polish='VentilationPolish.json'
+$names.night_guidance='NightGuidance.json'
 $normal='D:\HouseCoursework_Build\Windows\HouseCoursework\Saved\Lighting\room_lighting.json'
 $before=if(Test-Path -LiteralPath $normal){(Get-FileHash -LiteralPath $normal).Hash}else{'missing'}
 $started=Get-Date

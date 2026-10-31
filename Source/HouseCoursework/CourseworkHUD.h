@@ -343,11 +343,17 @@ private:
     int32 SmartLightingScene=0,SmartPlayerZone=INDEX_NONE;
     bool bSmartReadingOccupied=false;
     double SmartReadingUntil=0;
+    FVector SmartNightHeading=FVector::ZeroVector;
+    FName SmartNightPreferredFixture;
+    double SmartNightStartedAt=0;
+    bool bSmartNightWalking=false;
+    void UpdateNightGuidance(float DeltaSeconds,FVector Player,double Now);
     void TickSmartLighting(float DeltaSeconds);
     void ApplySmartLighting();
     int32 SmartZoneAt(FVector Position)const;
     float GetSmartTargetLevel(FName Actor)const;
     void TickSmartLightingAcceptance();
+    void TickNightGuidanceAcceptance();
 
     void ToggleControls();
     void TogglePause();

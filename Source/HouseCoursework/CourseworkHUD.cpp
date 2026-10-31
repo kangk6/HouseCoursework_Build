@@ -506,6 +506,7 @@ void ACourseworkHUD::TickAcceptanceTest()
 {
     if(TestMode==TEXT("environment_regression")){TickEnvironmentRegression();return;}
     if(TestMode==TEXT("smart_lighting")){TickSmartLightingAcceptance();return;}
+    if(TestMode==TEXT("night_guidance")){TickNightGuidanceAcceptance();return;}
     if(TestMode==TEXT("ui_transitions")){TickTransitionAcceptance();return;}
     auto* PC = GetOwningPlayerController();
     auto* Character = PC ? Cast<ACharacter>(PC->GetPawn()) : nullptr;
