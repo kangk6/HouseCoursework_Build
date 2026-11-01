@@ -60,6 +60,16 @@ void ACourseworkHUD::TickCelestialAcceptance()
   R.Before=Daylight->GetMoonDirection();R.Hour=GetDaylightHour();SetPanel(2);break;
  case 16:Check(TEXT("pause_keeps_time_and_body_position"),GetDaylightHour()==R.Hour&&R.Before.Equals(Daylight->GetMoonDirection(),.00001f));SetPanel(0);SetTimeFlowing(false);Hour(21);TriggerKitchenAlarm();R.Hour=GetDaylightHour();break;
  case 17:Check(TEXT("fire_keeps_selected_time"),IsSafetyDrillRunning()&&GetDaylightHour()==R.Hour);ResetKitchenAlarm();Check(TEXT("after_fire_celestial_state_remains_valid"),Daylight->CheckCelestialParameters());RestoreDaylight();Check(TEXT("restore_removes_moon_and_restores_authored_sky"),Daylight->CheckRestored());
-  FFileHelper::SaveStringToFile(TEXT("{\"method\":\"Elevated diagnostic sky views, native time/weather state changes; not a player walkthrough\",\"checks\":[")+FString::Join(TestResults,TEXT(","))+TEXT("]}"),*(FPaths::ProjectSavedDir()/TEXT("CelestialAcceptance.json")));TestMode.Empty();QuitApplication();return;
+  InitializeTimeOfDay();SetTimeFlowing(false);WeatherNow(0);Hour(21);P->SetActorEnableCollision(true);
+  Check(TEXT("courtyard_standing_position_reachable"),P->TeleportTo({-2800,10400,150},FRotator::ZeroRotator,false,false));P->GetCharacterMovement()->SetMovementMode(MOVE_Walking);Aim(true);break;
+ case 18:Shot(TEXT("Celestial_yard_moon.png"));break;
+ case 19:Hour(17.7f);Aim(false);break;
+ case 20:Shot(TEXT("Celestial_yard_sunset.png"));break;
+ case 21:Hour(19);ObserveVentilation(1);PC->SetControlRotation(PC->GetControlRotation()+FRotator(12,0,0));break;
+ case 22:Check(TEXT("bedroom_window_uses_normal_eye_height"),P->GetActorLocation().Z>380&&P->GetActorLocation().Z<440);Shot(TEXT("Celestial_bedroom_window.png"));break;
+ case 23:Hour(21);ObserveVentilation(4);PC->SetControlRotation(PC->GetControlRotation()+FRotator(12,0,0));break;
+ case 24:Check(TEXT("study_window_uses_normal_eye_height"),P->GetActorLocation().Z>380&&P->GetActorLocation().Z<440);Shot(TEXT("Celestial_study_window.png"));break;
+ case 25:
+  FFileHelper::SaveStringToFile(TEXT("{\"method\":\"Diagnostic sky and normal-height courtyard/window placements, native time/weather state changes; not a continuous player walkthrough\",\"checks\":[")+FString::Join(TestResults,TEXT(","))+TEXT("]}"),*(FPaths::ProjectSavedDir()/TEXT("CelestialAcceptance.json")));TestMode.Empty();QuitApplication();return;
  }
 }

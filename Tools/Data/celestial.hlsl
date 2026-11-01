@@ -9,21 +9,27 @@ float saa=max(fwidth(sd),.00008),maa=max(fwidth(md),.00008);
 float sun=1-smoothstep(.0056-saa,.0056+saa,sd);
 float3 right=normalize(cross(float3(0,0,1),m));
 float3 up=cross(m,right);
-float2 q=float2(dot(d,right),dot(d,up))/.0113;
-float disk=1-smoothstep(.0113-maa,.0113+maa,md);
-float maria=exp(-dot(q-float2(-.25,.15),q-float2(-.25,.15))*9)
- +.7*exp(-dot(q-float2(.22,.42),q-float2(.22,.42))*18)
- +.5*exp(-dot(q-float2(-.4,-.3),q-float2(-.4,-.3))*25);
-float fine=.04*sin(q.x*75+sin(q.y*32))+.025*sin(q.y*103+q.x*48);
-float craters=0;
-[unroll] for(int k=0;k<7;k++)
+float2 q=float2(dot(d,right),dot(d,up))/.0087;
+float disk=1-smoothstep(.0087-maa,.0087+maa,md);
+// Broad asymmetric maria remain readable at normal FOV; avoid high-frequency
+// stripes and strong sphere shading on the fixed full-moon face.
+float maria= .65*exp(-dot((q-float2(-.25,.22))*float2(1,1.4),(q-float2(-.25,.22))*float2(1,1.4))*5)
+ +.52*exp(-dot(q-float2(.30,.34),q-float2(.30,.34))*17)
+ +.38*exp(-dot(q-float2(-.47,-.27),q-float2(-.47,-.27))*24)
+ +.22*exp(-dot(q-float2(.1,-.1),q-float2(.1,-.1))*28);
+float fine=.018*sin(q.x*13+sin(q.y*9))+.014*sin(q.y*19+q.x*7);
+float craters=0;float footprint=max(length(fwidth(q))*.45,.018);
+[unroll] for(int k=0;k<11;k++)
 {
- float2 c=.72*sin(float2(k*13.17+1,k*7.31+4));
- float r=length(q-c),size=.035+.014*(k%3);
- craters+=.10*exp(-pow((r-size)/.014,2))-.075*exp(-pow(r/size,2));
+ float2 c=.76*sin(float2(k*13.17+1,k*7.31+4));
+ float r=length(q-c),size=.045+.025*(k%4);
+ float rim=exp(-pow((r-size)/footprint,2));
+ float bowl=1-smoothstep(max(0,size-footprint),size+footprint,r);
+ craters+=.035*rim-.06*bowl;
 }
-float relief=saturate(.88-.28*maria+fine+craters)*lerp(.5,1,sqrt(saturate(1-dot(q,q))));
-float moonHalo=exp(-md*md/ .0009)*.003;
+float relief=clamp(.90-.66*saturate(maria)+fine+craters,.24,.92);
+relief*=lerp(.82,1,sqrt(saturate(1-dot(q,q))));
+float moonHalo=exp(-md*md/.0002)*.0012;
 float cs=cos(Spin),sn=sin(Spin);
 float3 starDirection=float3(d.x*cs-d.y*sn,d.x*sn+d.y*cs,d.z);
 // Cube-face placement avoids latitude/longitude seams and polar clustering.
@@ -40,19 +46,21 @@ if(face<2)starCenter=float3(cplane,sgn);
 else if(face<4)starCenter=float3(sgn,cplane);
 else starCenter=float3(cplane.x,sgn,cplane.y);
 starCenter=normalize(starCenter);
-float radius=lerp(.00025,.00065,frac(hash*71));
+float rank=pow(frac(hash*233),4);
+float radius=lerp(.00023,.0008,rank);
 float aa=max(length(fwidth(starDirection))*.45,.0001);
-float star=(1-smoothstep(radius,radius+aa,length(starDirection-starCenter)))*step(.993,hash);
+float star=(1-smoothstep(radius,radius+aa,length(starDirection-starCenter)))*step(.995,hash);
 star*=saturate(radius/aa);
-float twinkle=.94+.06*sin(Time*.9+hash*200);
+float twinkle=.98+.02*sin(Time*.65+hash*200);
 float3 starTint=lerp(float3(.72,.83,1),float3(1,.9,.75),frac(hash*113));
-float3 color=SunColor*(sun*18+exp(-sd*sd/.0006)*.08)*SunAmount;
-color+=float3(.86,.9,1)*(disk*relief*.14+moonHalo)*MoonAmount;
-color+=starTint*star*(.025+.075*frac(hash*233))*twinkle*StarAmount*smoothstep(.025,.18,d.z);
+float sunRadiance=lerp(1.8,12,smoothstep(0,.45,s.z));
+float3 color=SunColor*(sun*sunRadiance+exp(-sd*sd/.00016)*.025)*SunAmount;
+color+=float3(.94,.95,1)*(disk*relief*.17+moonHalo)*MoonAmount;
+color+=starTint*star*(.02+.13*rank)*twinkle*StarAmount*smoothstep(.10,.40,d.z)*lerp(1,.12*(1-smoothstep(.035,.30,md))+smoothstep(.035,.30,md),MoonAmount);
 // The old sky reached zero on both day and night branches at the horizon.
 // Bridge that visual gap without adding a second world illumination source.
 float towardSun=pow(saturate(dot(normalize(d.xy+float2(.00001,0)),normalize(s.xy+float2(.00001,0)))),4);
-float low=exp(-max(0,d.z)*5);
-float3 twilight=lerp(float3(.004,.012,.035),lerp(float3(.08,.075,.08),float3(.18,.065,.025),towardSun),low);
+float low=exp(-max(0,d.z)*7);
+float3 twilight=lerp(float3(.004,.012,.035),lerp(float3(.045,.055,.08),float3(.14,.06,.026),towardSun),low);
 twilight=lerp(twilight,float3(.038,.043,.05),saturate(CloudMask)*.65);
 return color*visibility+twilight*TwilightAmount*smoothstep(-.06,.025,d.z);
