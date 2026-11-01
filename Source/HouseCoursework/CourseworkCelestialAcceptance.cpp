@@ -69,7 +69,13 @@ void ACourseworkHUD::TickCelestialAcceptance()
  case 22:Check(TEXT("bedroom_window_uses_normal_eye_height"),P->GetActorLocation().Z>380&&P->GetActorLocation().Z<440);Shot(TEXT("Celestial_bedroom_window.png"));break;
  case 23:Hour(21);ObserveVentilation(4);PC->SetControlRotation(PC->GetControlRotation()+FRotator(12,0,0));break;
  case 24:Check(TEXT("study_window_uses_normal_eye_height"),P->GetActorLocation().Z>380&&P->GetActorLocation().Z<440);Shot(TEXT("Celestial_study_window.png"));break;
- case 25:
+ case 25:Hour(12);WeatherNow(0);P->TeleportTo({-2800,10400,150},FRotator::ZeroRotator,false,false);PC->SetControlRotation({-3,-95,0});break;
+ case 26:Shot(TEXT("Celestial_yard_noon.png"));break;
+ case 27:WeatherNow(3);break;
+ case 28:Shot(TEXT("Celestial_yard_rain.png"));break;
+ case 29:WeatherNow(0);Hour(0);ObserveVentilation(1);PC->SetControlRotation(PC->GetControlRotation()+FRotator(12,0,0));break;
+ case 30:Shot(TEXT("Celestial_bedroom_midnight.png"));break;
+ case 31:
   FFileHelper::SaveStringToFile(TEXT("{\"method\":\"Diagnostic sky and normal-height courtyard/window placements, native time/weather state changes; not a continuous player walkthrough\",\"checks\":[")+FString::Join(TestResults,TEXT(","))+TEXT("]}"),*(FPaths::ProjectSavedDir()/TEXT("CelestialAcceptance.json")));TestMode.Empty();QuitApplication();return;
  }
 }

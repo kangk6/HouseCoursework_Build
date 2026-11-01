@@ -28,6 +28,14 @@ ACourseworkDaylight::ACourseworkDaylight()
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Mesh3(TEXT("/Game/Coursework/Daylight/SM_Curtains_A3_Daylight.SM_Curtains_A3_Daylight"));
     if(Mesh3.Object)ComparisonMeshes.Add(Mesh3.Object);
     auto* Root=CreateDefaultSubobject<USceneComponent>(TEXT("EnvironmentRoot"));SetRootComponent(Root);
+    BackgroundGround=CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DistantGround"));BackgroundGround->SetupAttachment(Root);
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> GroundMaterial(TEXT("/Game/HouseFurniture/Materials/Generic/MI_Grass_A.MI_Grass_A"));
+    BackgroundGround->bVisibleInRealTimeSkyCaptures=false;BackgroundGround->bVisibleInReflectionCaptures=false;
+    BackgroundGround->bAffectDistanceFieldLighting=false;BackgroundGround->bAffectDynamicIndirectLighting=false;
+    BackgroundGround->SetStaticMesh(GroundMesh.Object);BackgroundGround->SetMaterial(0,GroundMaterial.Object);
+    BackgroundGround->SetRelativeLocation(FVector(-2000,5000,-26));BackgroundGround->SetRelativeScale3D(FVector(20000,20000,1));
+    BackgroundGround->SetCollisionEnabled(ECollisionEnabled::NoCollision);BackgroundGround->SetCanEverAffectNavigation(false);BackgroundGround->SetCastShadow(false);BackgroundGround->SetVisibility(false);
     Sun=CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("ComparisonSun"));Sun->SetupAttachment(Root);
     Sun->SetMobility(EComponentMobility::Movable);Sun->SetVisibility(false);
     Sun->DynamicShadowDistanceMovableLight=6000;Sun->DynamicShadowCascades=4;Sun->ShadowBias=.35f;
@@ -48,6 +56,8 @@ bool ACourseworkDaylight::Apply(float Value)
     if(!FMath::IsFinite(Value))return false;
     if(!bActive)
     {
+        if(!Cast<UMaterialInstanceDynamic>(BackgroundGround->GetMaterial(0)))if(auto* GroundMID=BackgroundGround->CreateDynamicMaterialInstance(0))
+        {GroundMID->SetScalarParameterValue(TEXT("Tile_U"),2000);GroundMID->SetScalarParameterValue(TEXT("Tile_V"),2000);}
         Actors.Empty();Components.Empty();Meshes.Empty();OriginalMeshReferences.Empty();SkyParameters.Empty();WeatherSkies.Empty();
         for(TActorIterator<AActor> It(GetWorld());It;++It)
         {
@@ -203,6 +213,7 @@ void ACourseworkDaylight::UpdateLighting()
         M->SetScalarParameterValue(TEXT("Sun height"),FMath::Max(0.f,SolarElevation/90));
         const FVector D=Sun->GetForwardVector();M->SetVectorParameterValue(TEXT("Light direction"),FMath::Lerp(S.Direction,FLinearColor(D.X,D.Y,D.Z,1),DayWeight));
     }
+    BackgroundGround->SetVisibility(true);
     UpdateCelestial(SolarElevation,Cloud);
     Sky->SetVisibility(true);Sun->SetVisibility(true);
     for(const auto& S:Actors)if(auto* A=S.Actor.Get())
@@ -242,6 +253,7 @@ void ACourseworkDaylight::Restore()
 {
     if(!bActive)return;
     bAtmosphereFenceStarted=false;AtmosphereFenceFrame=0;
+    BackgroundGround->SetVisibility(false);
     Moon->SetVisibility(false);Moon->SetIntensity(0);CelestialSunAmount=CelestialMoonAmount=CelestialStarAmount=0;
     Sun->SetVisibility(false);Sun->SetIntensity(0);Atmosphere->SetVisibility(false);Sky->SetVisibility(false);
     if(Exposure){Exposure->Destroy();Exposure=nullptr;}
@@ -257,7 +269,7 @@ void ACourseworkDaylight::Restore()
 }
 bool ACourseworkDaylight::CheckRestored()const
 {
-    if(bActive||IsActorTickEnabled()||Moon->IsVisible()||Moon->Intensity>0||Sun->IsVisible()||Sky->IsVisible()||Atmosphere->IsVisible()||Exposure||LensEffects)return false;
+    if(bActive||IsActorTickEnabled()||BackgroundGround->IsVisible()||Moon->IsVisible()||Moon->Intensity>0||Sun->IsVisible()||Sky->IsVisible()||Atmosphere->IsVisible()||Exposure||LensEffects)return false;
     for(const auto& S:SkyParameters)if(auto* M=S.Material.Get())
     {for(const auto& P:S.Colors){FLinearColor Color;if(!M->GetVectorParameterValue(FMaterialParameterInfo(P.Key),Color)||!Color.Equals(P.Value,.000001f))return false;}for(const auto& P:S.Brightness){float Value=0;if(!M->GetScalarParameterValue(FMaterialParameterInfo(P.Key),Value)||!FMath::IsNearlyEqual(Value,P.Value,.000001f))return false;}}
     if(auto* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.SkyLight.RealTimeReflectionCapture.TimeSlice")))if(CVar->GetInt()!=OriginalSkyTimeSlice)return false;

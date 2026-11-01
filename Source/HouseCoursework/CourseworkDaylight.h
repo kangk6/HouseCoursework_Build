@@ -50,6 +50,7 @@ private:
     UPROPERTY() TArray<TObjectPtr<class UStaticMesh>> ComparisonMeshes;
     TArray<FActorState> Actors;
     TArray<FComponentState> Components;
+    UPROPERTY() TObjectPtr<class UStaticMeshComponent> BackgroundGround;
     UPROPERTY() TObjectPtr<class UDirectionalLightComponent> Sun;
     UPROPERTY() TObjectPtr<class UDirectionalLightComponent> Moon;
     UPROPERTY() TObjectPtr<class UMaterialInterface> CelestialMaterial;
