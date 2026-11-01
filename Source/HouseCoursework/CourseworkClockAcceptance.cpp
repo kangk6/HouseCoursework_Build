@@ -50,7 +50,8 @@ void ACourseworkHUD::TickClockAcceptance()
         Player->GetCharacterMovement()->StopMovementImmediately();Player->GetCharacterMovement()->DisableMovement();Player->SetActorEnableCollision(false);
         Place(FVector(-2100,9870,151.5),FVector(-2350,9870,90));SetPanel(0);return;
     }
-    if(Now-R.At<2.2)return;R.At=Now;
+    // A midnight-to-noon seek includes sky interpolation and the gentle night-light fade.
+    if(Now-R.At<(R.Step==7?5.:2.2))return;R.At=Now;
     switch(R.Step++)
     {
     case 0:

@@ -69,3 +69,8 @@ Ventilation v0.16: separated window parts and leaf material are derived from the
 Desk lamps v0.16.1: independent emissive material copies retain the existing HouseFurniture textures. The small added living-room bulb uses a copy of Unreal Engine's BasicShapes/Sphere; its simple warm emissive material is created locally. Original furniture and engine assets are unchanged.
 
 Hall lamps v0.16.2: the landing lamp uses independent copies of the existing HouseFurniture C1 furniture material/textures with a locally generated shade/bulb emission mask. Sconces reuse the source E1 illumination material on runtime instances. All original HouseFurniture assets remain unchanged.
+
+
+## v0.22.8 日月星空
+
+`M_CelestialSky` 是 Unreal Engine 5.3 自带 `M_Sky_Panning_Clouds2` 的独立项目副本，保留原天空与云纹理引用，原引擎资源未修改。太阳、月面纹理、星点及暮光由本项目的 `Tools/Data/celestial.hlsl` 程序生成，没有新增外部图片、天文数据或第三方模型；星点不代表真实星座。生成工具依赖 UE 5.3 原材质节点结构。派生材质通过组内资源包分发，公开仓库只提交源码与清单。

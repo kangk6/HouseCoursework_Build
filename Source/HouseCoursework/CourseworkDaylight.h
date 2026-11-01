@@ -27,6 +27,13 @@ public:
     FRotator GetSunRotation()const;
     void SetWeather(float Cover,float Direct,float Diffuse,float Light);
     bool IsSunShadowed()const;
+    bool HasCelestialSky()const;
+    FVector GetMoonDirection()const;
+    float GetCelestialSunAmount()const{return CelestialSunAmount;}
+    float GetCelestialMoonAmount()const{return CelestialMoonAmount;}
+    float GetCelestialStarAmount()const{return CelestialStarAmount;}
+    float GetMoonIntensity()const;
+    bool CheckCelestialParameters()const;
     virtual void Tick(float DeltaSeconds)override;
     virtual void EndPlay(const EEndPlayReason::Type Reason)override;
 private:
@@ -44,6 +51,10 @@ private:
     TArray<FActorState> Actors;
     TArray<FComponentState> Components;
     UPROPERTY() TObjectPtr<class UDirectionalLightComponent> Sun;
+    UPROPERTY() TObjectPtr<class UDirectionalLightComponent> Moon;
+    UPROPERTY() TObjectPtr<class UMaterialInterface> CelestialMaterial;
+    float CelestialSunAmount=0,CelestialMoonAmount=0,CelestialStarAmount=0;
+    void UpdateCelestial(float SolarElevation,float Cloud);
     UPROPERTY() TObjectPtr<class USkyAtmosphereComponent> Atmosphere;
     UPROPERTY() TObjectPtr<class USkyLightComponent> Sky;
     UPROPERTY() TObjectPtr<class APostProcessVolume> Exposure;

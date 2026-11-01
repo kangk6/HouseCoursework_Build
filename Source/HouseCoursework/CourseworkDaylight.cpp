@@ -32,6 +32,13 @@ ACourseworkDaylight::ACourseworkDaylight()
     Sun->SetMobility(EComponentMobility::Movable);Sun->SetVisibility(false);
     Sun->DynamicShadowDistanceMovableLight=6000;Sun->DynamicShadowCascades=4;Sun->ShadowBias=.35f;
     Sun->bAtmosphereSunLight=true;Sun->AtmosphereSunLightIndex=0;
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> Celestial(TEXT("/Game/Coursework/Celestial/M_CelestialSky.M_CelestialSky"));
+    CelestialMaterial=Celestial.Object;
+    if(CelestialMaterial)Sun->AtmosphereSunDiskColorScale=FLinearColor::Black;
+    Moon=CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("Moonlight"));Moon->SetupAttachment(Root);
+    Moon->SetMobility(EComponentMobility::Movable);Moon->SetVisibility(false);Moon->SetIntensity(0);
+    Moon->DynamicShadowDistanceMovableLight=6000;Moon->DynamicShadowCascades=3;Moon->ShadowBias=.35f;
+    Moon->SetLightSourceAngle(1.3f);Moon->bAtmosphereSunLight=false;
     Atmosphere=CreateDefaultSubobject<USkyAtmosphereComponent>(TEXT("ComparisonAtmosphere"));Atmosphere->SetupAttachment(Root);Atmosphere->SetVisibility(false);
     Sky=CreateDefaultSubobject<USkyLightComponent>(TEXT("ComparisonSky"));Sky->SetupAttachment(Root);
     Sky->SetMobility(EComponentMobility::Movable);Sky->SourceType=SLS_CapturedScene;Sky->bRealTimeCapture=true;Sky->bLowerHemisphereIsBlack=true;Sky->CubemapResolution=64;Sky->SetVisibility(false);
@@ -67,7 +74,7 @@ bool ACourseworkDaylight::Apply(float Value)
                     SkyParameters.Add(MoveTemp(State));
                     FWeatherSky W;W.Mesh=Mesh;W.Slot=Slot;W.Original=MID;OriginalMeshReferences.Emplace(MID);W.Colors=SkyParameters.Last().Colors;W.Brightness=SkyParameters.Last().Brightness;
                     W.Direction=MID->K2_GetVectorParameterValue(TEXT("Light direction"));
-                    auto* WeatherMID=UMaterialInstanceDynamic::Create(MID->Parent,Mesh);WeatherMID->CopyParameterOverrides(MID);Mesh->SetMaterial(Slot,WeatherMID);W.Material=WeatherMID;WeatherSkies.Add(MoveTemp(W));
+                    auto* WeatherMID=UMaterialInstanceDynamic::Create(CelestialMaterial?CelestialMaterial.Get():MID->Parent.Get(),Mesh);WeatherMID->CopyParameterOverrides(MID);Mesh->SetMaterial(Slot,WeatherMID);W.Material=WeatherMID;WeatherSkies.Add(MoveTemp(W));
                 }
                 if(!Ambient)C->SetVisibility(false,false);
             }
@@ -196,6 +203,7 @@ void ACourseworkDaylight::UpdateLighting()
         M->SetScalarParameterValue(TEXT("Sun height"),FMath::Max(0.f,SolarElevation/90));
         const FVector D=Sun->GetForwardVector();M->SetVectorParameterValue(TEXT("Light direction"),FMath::Lerp(S.Direction,FLinearColor(D.X,D.Y,D.Z,1),DayWeight));
     }
+    UpdateCelestial(SolarElevation,Cloud);
     Sky->SetVisibility(true);Sun->SetVisibility(true);
     for(const auto& S:Actors)if(auto* A=S.Actor.Get())
         A->SetActorHiddenInGame(S.Hidden||A->FindComponentByClass<USkyLightComponent>()||(!WeatherSkies.Num()&&!OriginalNight&&A->GetClass()->GetName().Contains(TEXT("Sky"))));
@@ -215,6 +223,7 @@ void ACourseworkDaylight::UpdateLighting()
             // keep this legacy proxy below its authored night contribution.
             const float BounceWeight=1-DayBlend+DayBlend*.8f*WeatherDiffuse;
             if(S.AmbientIntensity>=0)L->SetIntensity(S.AmbientIntensity*(C->GetOwner()->GetName().StartsWith(TEXT("CourseworkNightAmbient_"))?BounceWeight:NightWeight));
+            if(CelestialMaterial&&Cast<UDirectionalLightComponent>(L))L->SetIntensity(0);
             C->SetVisibility(S.Visible,false);
         }
         else C->SetVisibility(S.Visible&&(!C->GetOwner()->GetClass()->GetName().Contains(TEXT("Sky"))||OriginalNight||WeatherSkies.Num()>0),false);
@@ -233,6 +242,7 @@ void ACourseworkDaylight::Restore()
 {
     if(!bActive)return;
     bAtmosphereFenceStarted=false;AtmosphereFenceFrame=0;
+    Moon->SetVisibility(false);Moon->SetIntensity(0);CelestialSunAmount=CelestialMoonAmount=CelestialStarAmount=0;
     Sun->SetVisibility(false);Sun->SetIntensity(0);Atmosphere->SetVisibility(false);Sky->SetVisibility(false);
     if(Exposure){Exposure->Destroy();Exposure=nullptr;}
     if(LensEffects){LensEffects->Destroy();LensEffects=nullptr;}
@@ -247,7 +257,7 @@ void ACourseworkDaylight::Restore()
 }
 bool ACourseworkDaylight::CheckRestored()const
 {
-    if(bActive||IsActorTickEnabled()||Sun->IsVisible()||Sky->IsVisible()||Atmosphere->IsVisible()||Exposure||LensEffects)return false;
+    if(bActive||IsActorTickEnabled()||Moon->IsVisible()||Moon->Intensity>0||Sun->IsVisible()||Sky->IsVisible()||Atmosphere->IsVisible()||Exposure||LensEffects)return false;
     for(const auto& S:SkyParameters)if(auto* M=S.Material.Get())
     {for(const auto& P:S.Colors){FLinearColor Color;if(!M->GetVectorParameterValue(FMaterialParameterInfo(P.Key),Color)||!Color.Equals(P.Value,.000001f))return false;}for(const auto& P:S.Brightness){float Value=0;if(!M->GetScalarParameterValue(FMaterialParameterInfo(P.Key),Value)||!FMath::IsNearlyEqual(Value,P.Value,.000001f))return false;}}
     if(auto* CVar=IConsoleManager::Get().FindConsoleVariable(TEXT("r.SkyLight.RealTimeReflectionCapture.TimeSlice")))if(CVar->GetInt()!=OriginalSkyTimeSlice)return false;

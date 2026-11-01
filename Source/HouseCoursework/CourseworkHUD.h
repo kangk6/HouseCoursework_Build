@@ -354,6 +354,7 @@ private:
     float GetSmartTargetLevel(FName Actor)const;
     void TickSmartLightingAcceptance();
     void TickNightGuidanceAcceptance();
+    void TickCelestialAcceptance();
 
     void ToggleControls();
     void TogglePause();

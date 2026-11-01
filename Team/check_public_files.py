@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-ALLOWED = {'.cpp', '.h', '.cs', '.inl', '.py', '.ps1', '.json', '.md', '.ini', '.uproject', '.txt', '.yml', '.yaml'}
+ALLOWED = {'.cpp', '.h', '.hlsl', '.cs', '.inl', '.py', '.ps1', '.json', '.md', '.ini', '.uproject', '.txt', '.yml', '.yaml'}
 
 
 def main():

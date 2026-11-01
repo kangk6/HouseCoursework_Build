@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "v0.22.0-rain-polish",
+  "version": "v0.22.8-celestial",
   "files": [
     {
       "path": "Content/BlankDefault/Levels/Blank_Empty.umap",
@@ -13,6 +13,12 @@
       "size": 21656,
       "sha256": "19baf70c7c536fce3cabfcc3df3046bee11ae6be11b8938ef2cc92b7e88bc353",
       "pack": "assets-v0.17.1-base-coursework.zip"
+    },
+    {
+      "path": "Content/Coursework/Celestial/M_CelestialSky.uasset",
+      "size": 50970,
+      "sha256": "96cc7e5387a35d9bc346d76b5170235ec6417df66ae0eac404afa14149e507a3",
+      "pack": "assets-v0.22.8-celestial-delta.zip"
     },
     {
       "path": "Content/Coursework/Daylight/SM_Curtains_A1_Daylight.uasset",
@@ -14554,6 +14560,11 @@
       "name": "assets-v0.22.0-rain-polish-delta.zip",
       "size": 10760,
       "sha256": "bea2bf87174dc4b7b166ecb5c7eae8e0271984513389202989d721bc022c5ac0"
+    },
+    {
+      "name": "assets-v0.22.8-celestial-delta.zip",
+      "size": 12492,
+      "sha256": "bdd4e4522fc8068fc74678cd8aa85a702322007cd443e5984a0dfcb3e6783d47"
     }
   ]
 }
