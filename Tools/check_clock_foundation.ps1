@@ -1,7 +1,7 @@
 ﻿param(
     [string]$GameRoot='D:\HouseCoursework_Team\Artifacts\ClockFoundation\Windows',
     [string]$EvidenceRoot='D:\HouseCoursework_Team\Saved\Acceptance\ClockFoundation',
-    [ValidateSet('celestial','night_guidance','ventilation_polish','lamp_glare','weather_exterior','rain_polish','rain_profile','rain_brightness','rain','linkage','interaction','fixture','household_weather','clock','daylight','environment_regression','smart_lighting','ventilation','energy','solar','ui_transitions','daylight_sweep','dial','startup','day_cycle','drill_restore','evacuation','evacuation_upper')][string]$Mode='clock',
+    [ValidateSet('safety_response','celestial','night_guidance','ventilation_polish','lamp_glare','weather_exterior','rain_polish','rain_profile','rain_brightness','rain','linkage','interaction','fixture','household_weather','clock','daylight','environment_regression','smart_lighting','ventilation','energy','solar','ui_transitions','daylight_sweep','dial','startup','day_cycle','drill_restore','evacuation','evacuation_upper','evacuation_blocked')][string]$Mode='clock',
     [int]$Height=720,
     [string[]]$ExtraArguments=@()
 )
@@ -9,10 +9,11 @@ $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force -Path $EvidenceRoot | Out-Null
 $saved=Join-Path $GameRoot 'HouseCoursework\Saved'
 $names=@{dial='DialAcceptance.json';startup='StartupAcceptance.json';clock='ClockAcceptance.json';daylight='DaylightAcceptance.json';environment_regression='EnvironmentRegression.json';smart_lighting='SmartLightingAcceptance.json';ventilation='VentilationAcceptance.json';energy='EnergyAcceptance.json';ui_transitions='TransitionAcceptance.json';daylight_sweep='DaylightSweep.json'}
-$names.day_cycle='DayCycleAcceptance.json';$names.drill_restore='DrillRestoreAcceptance.json';$names.evacuation='EvacuationAcceptance.json';$names.evacuation_upper='EvacuationAcceptance.json'
+$names.day_cycle='DayCycleAcceptance.json';$names.drill_restore='DrillRestoreAcceptance.json';$names.evacuation='EvacuationAcceptance.json';$names.evacuation_upper='EvacuationAcceptance.json';$names.evacuation_blocked='EvacuationAcceptance.json'
 $names.weather_exterior='WeatherExterior.json';$names.rain_polish='RainPolish.json';$names.rain_profile='RainProfile.json';$names.rain_brightness='RainBrightness.json';$names.rain='RainAcceptance.json';$names.linkage='LinkageAcceptance.json';$names.interaction='InteractionAcceptance.json';$names.fixture='FixtureAcceptance.json';$names.solar='SolarAcceptance.json';$names.household_weather='HouseholdWeatherAcceptance.json'
 $names.lamp_glare='LampGlare.json'
 $names.ventilation_polish='VentilationPolish.json'
+$names.safety_response='SafetyResponse.json'
 $names.celestial='CelestialAcceptance.json'
 $names.night_guidance='NightGuidance.json'
 $normal='D:\HouseCoursework_Build\Windows\HouseCoursework\Saved\Lighting\room_lighting.json'

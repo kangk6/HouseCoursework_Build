@@ -281,6 +281,7 @@ void ACourseworkHUD::Tick(float DeltaSeconds)
 
 void ACourseworkHUD::UpdateInteraction()
 {
+    bTargetSafetyIsolator=false;
     TargetActor.Reset(); TargetComponent.Reset(); TargetLabel.Empty();TargetLightRoom=INDEX_NONE;TargetLightFixture.Reset();TargetWindow=INDEX_NONE;TargetAppliance=INDEX_NONE;
     if(bLightKeyHeld){RefreshLightInteraction();return;}
     auto* PC = GetOwningPlayerController();
@@ -294,6 +295,7 @@ void ACourseworkHUD::UpdateInteraction()
     {
         if(!Selected.GetActor())return false;
         if(!LightFixtureRooms.Contains(Selected.GetComponent())&&CourseworkVisibility::IsOpaqueViewBlocked(GetWorld(),PC->GetPawn(),Selected.GetActor(),Start,Selected.ImpactPoint))return false;
+        if(SetSafetyTarget(Selected))return true;
         if(SetWindowTarget(Selected))return true;
         if(SetApplianceTarget(Selected))return true;
         if(SetLightTarget(Selected))return true;
@@ -437,6 +439,7 @@ void ACourseworkHUD::Interact()
 {
     if (PanelMode != 0 || GetWorld()->GetRealTimeSeconds() < NextInteractionTime) return;
     UpdateInteraction();
+    if(bTargetSafetyIsolator){IsolateKitchenHeat();NextInteractionTime=GetWorld()->GetRealTimeSeconds()+.3;UpdateInteraction();return;}
     if(TargetAppliance!=INDEX_NONE){if(IsSafetyDrillRunning()){ShowToast(TEXT("演练期间请优先疏散"));return;}ToggleAppliance(TargetAppliance);NextInteractionTime=GetWorld()->GetRealTimeSeconds()+.25;UpdateInteraction();return;}
     if(TargetWindow!=INDEX_NONE&&Ventilation)
     {
@@ -506,6 +509,7 @@ void ACourseworkHUD::TickAcceptanceTest()
 {
     if(TestMode==TEXT("environment_regression")){TickEnvironmentRegression();return;}
     if(TestMode==TEXT("smart_lighting")){TickSmartLightingAcceptance();return;}
+    if(TestMode==TEXT("safety_response")){TickSafetyResponseAcceptance();return;}
     if(TestMode==TEXT("celestial")){TickCelestialAcceptance();return;}
     if(TestMode==TEXT("night_guidance")){TickNightGuidanceAcceptance();return;}
     if(TestMode==TEXT("ui_transitions")){TickTransitionAcceptance();return;}

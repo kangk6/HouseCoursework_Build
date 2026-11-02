@@ -65,23 +65,21 @@ void ACourseworkHUD::InitializeSafety()
     SafetySiren->bAutoActivate=false;SafetySiren->bAutoDestroy=false;SafetySiren->bIsUISound=false;
     SafetySiren->SetSound(SafetySirenWave);SafetySiren->SetVolumeMultiplier(.22f);
     SafetySiren->RegisterComponent();
-    InitializeEvacuation();
+    InitializeEvacuation();InitializeSafetyIsolator();
     UE_LOG(LogTemp,Display,TEXT("SAFETY_READY smoke=%d audio=%d location=%s"),SafetySmoke!=nullptr,SafetySiren!=nullptr,*AlarmLocation.ToString());
 }
 
 bool ACourseworkHUD::IsSafetyReady()const
-{return SafetySmoke&&SafetyFire&&SafetySiren&&OriginalResident.IsValid()&&ResidentLocomotion&&ResidentRunAnimation&&ResidentIdleAnimation&&SensorSignal&&AssemblyMarker;}
+{return SafetyIsolator&&SafetySmoke&&SafetyFire&&SafetySiren&&OriginalResident.IsValid()&&ResidentLocomotion&&ResidentRunAnimation&&ResidentIdleAnimation&&SensorSignal&&AssemblyMarker;}
 float ACourseworkHUD::GetSafetyProgress()const
 {return SafetyState==1?FMath::Clamp(SmokeReading/30.f,0.f,1.f):(int32(bPlayerGathered)+int32(HasResidentGathered()))*.5f;}
 FString ACourseworkHUD::GetSafetyStatus()const
 {
-    switch(SafetyState)
-    {
-    case 1:return TEXT("烟雾正在增加");
-    case 2:return TEXT("正在疏散");
-    case 3:return TEXT("两人已集合");
-    default:return TEXT("尚未启动演练");
-    }
+    if(SafetyState==0)return TEXT("尚未启动演练");
+    if(SafetyState==3)return KitchenIncident.Ignited?TEXT("人员已集合，火情未解除"):TEXT("两人已集合");
+    if(KitchenIncident.Cleared())return SafetyState>=2?TEXT("预警解除，继续撤离"):TEXT("预警已解除");
+    if(SafetyState>=2)return TEXT("正在疏散");
+    return KitchenIncident.Isolated?TEXT("设备已隔离，正在冷却"):TEXT("厨房过热预警");
 }
 void ACourseworkHUD::TriggerKitchenAlarm()
 {
@@ -94,26 +92,33 @@ void ACourseworkHUD::TriggerKitchenAlarm()
     SetSmartLightingScene(0);
     // A drill changes the hazard state, not the user's selected time of day.
     RestoreEnergyComparison();bEnergyMapLayer=false;
-    SafetyState=1;SmokeReading=0;AlarmElapsed=0;SafetySmokeLevel=0;
+    KitchenIncident=FCourseworkKitchenIncident();SafetyAlarmAt=-1;
+    SafetyState=1;UpdateSafetyIsolator();SmokeReading=0;AlarmElapsed=0;SafetySmokeLevel=0;
     bPlayerGathered=false;PlayerArrivalTime=-1;ResidentArrivalTime=-1;LastEvacuationResult.Empty();
     SafetySmoke->SetRelativeScale3D(FVector(.35f));SafetySmoke->SetComponentTickEnabled(true);SafetySmoke->ActivateSystem(true);
-    SafetyFire->SetRelativeScale3D(FVector(.24f));SafetyFire->SetComponentTickEnabled(true);SafetyFire->ActivateSystem(true);
+    SafetyFire->DeactivateImmediate();SafetyFire->SetComponentTickEnabled(false);
     if(Overlay)Overlay->RefreshPanel();
     UE_LOG(LogTemp,Display,TEXT("SAFETY_STATE smoke_building"));
 }
 void ACourseworkHUD::HandleKitchenAlarm()
 {
     // Ending an exercise never claims that the simulated fire was extinguished.
-    if(SafetyState!=3||!bPlayerGathered||!HasResidentGathered())return;
+    if(!CanFinishSafety())return;
     ResetKitchenAlarm();
 }
 void ACourseworkHUD::ResetKitchenAlarm(bool ResumeEnvironment)
 {
     const bool WasRunning=IsSafetyDrillRunning();
-    if(IsSafetyDrillRunning())LastEvacuationResult=SafetyState==3?
-        FString::Printf(TEXT("上次演练：两人均已集合 · %.1f 秒"),FMath::Max(PlayerArrivalTime,ResidentArrivalTime)):TEXT("上次演练已中止 · 未判定疏散完成");
+    if(IsSafetyDrillRunning())
+    {
+        const FString People=SafetyState==3?FString::Printf(TEXT("两人已集合，%.1f秒"),FMath::Max(PlayerArrivalTime,ResidentArrivalTime)):KitchenIncident.Cleared()&&SafetyState==1?TEXT("早期预警解除"):TEXT("演练已中止，疏散未完成");
+        const FString Isolation=KitchenIncident.Isolated?(SafetyAlarmAt<0||KitchenIncident.IsolationAt<SafetyAlarmAt?TEXT("报警前断开加热"):FString::Printf(TEXT("报警后%.1f秒断开加热"),KitchenIncident.IsolationAt-SafetyAlarmAt)):TEXT("加热回路未断开");
+        const FString Hazard=KitchenIncident.Ignited?TEXT("火源未控制"):KitchenIncident.Cleared()?TEXT("未发生起火"):TEXT("仍有过热或余烟");
+        LastEvacuationResult=People+TEXT("\n")+Isolation+TEXT("\n")+Hazard;
+    }
     RestoreResident();SafetyState=0;SmokeReading=0;AlarmElapsed=0;SafetySmokeLevel=0;
     bPlayerGathered=false;PlayerArrivalTime=-1;ResidentArrivalTime=-1;
+    KitchenIncident=FCourseworkKitchenIncident();SafetyAlarmAt=-1;UpdateSafetyIsolator();
     if(SafetySmoke)SafetySmoke->DeactivateImmediate();
     if(SafetyFire)SafetyFire->DeactivateImmediate();
     if(SafetyFireLight)SafetyFireLight->SetIntensity(0);
@@ -144,21 +149,22 @@ void ACourseworkHUD::TickSafety(float DeltaSeconds)
     if(SensorSignal)
     {
         const float Pulse=.2f+.8f*FMath::Max(0.f,FMath::Sin(GetWorld()->GetTimeSeconds()*7.f));
-        SensorSignal->SetVectorParameterValue(TEXT("SignalColor"),IsSafetyActive()?FLinearColor(.8f*Pulse,.015f,.005f):SafetyState==1?FLinearColor(.4f,.15f,.01f):FLinearColor(.02f,.07f,.025f));
+        SensorSignal->SetVectorParameterValue(TEXT("SignalColor"),IsSafetyActive()?FLinearColor(.8f*Pulse,.015f,.005f):SafetyState==1&&!KitchenIncident.Cleared()?FLinearColor(.4f,.15f,.01f):FLinearColor(.02f,.07f,.025f));
     }
     if(!IsSafetyDrillRunning())return;
-    SmokeReading=FMath::Min(100.f,SmokeReading+12.f*DeltaSeconds);SafetySmokeLevel=SmokeReading/100.f;
-    if(SafetySmoke)SafetySmoke->SetRelativeScale3D(FVector(.6f+.5f*SafetySmokeLevel));
-    if(SafetySmokeMaterial)SafetySmokeMaterial->SetScalarParameterValue(TEXT("SmokeOpacity"),.22f+.32f*SafetySmokeLevel);
-    const float FireStrength=FMath::Clamp(SmokeReading/60.f,0.f,1.f);
+    KitchenIncident.Advance(DeltaSeconds);SmokeReading=KitchenIncident.Sensor;SafetySmokeLevel=KitchenIncident.Smoke/100.f;
+    if(SafetySmoke)SafetySmoke->SetRelativeScale3D(FVector(.25f+.85f*SafetySmokeLevel));
+    if(SafetySmokeMaterial)SafetySmokeMaterial->SetScalarParameterValue(TEXT("SmokeOpacity"),.52f*SafetySmokeLevel);
+    const float FireStrength=KitchenIncident.Fire;
+    if(KitchenIncident.Ignited&&SafetyFire&&!SafetyFire->IsActive()){SafetyFire->SetComponentTickEnabled(true);SafetyFire->ActivateSystem(true);}
     if(SafetyFire)SafetyFire->SetRelativeScale3D(FVector(.24f+.36f*FireStrength));
-    if(SafetyFireLight){const float T=GetWorld()->GetTimeSeconds();SafetyFireLight->SetIntensity((250.f+550.f*FireStrength)*(.8f+.13f*FMath::Sin(T*11.7f)+.07f*FMath::Sin(T*23.1f)));}
+    if(SafetyFireLight){const float T=GetWorld()->GetTimeSeconds();SafetyFireLight->SetIntensity((FireStrength>0?250.f+550.f*FireStrength:0.f)*(.8f+.13f*FMath::Sin(T*11.7f)+.07f*FMath::Sin(T*23.1f)));}
     if(SafetyState==1&&SmokeReading>=30.f)
     {
-        SafetyState=2;AlarmElapsed=0;BeginResidentEvacuation();
+        SafetyState=2;SafetyAlarmAt=KitchenIncident.Elapsed;AlarmElapsed=0;BeginResidentEvacuation();
         AssemblyMarker->SetActorHiddenInGame(false);
         SafetySirenWave->ResetAudio();SafetySirenWave->QueueAudio(SafetySirenPCM.GetData(),SafetySirenPCM.Num());SafetySiren->SetVolumeMultiplier(.22f);SafetySiren->Play();
-        ShowToast(TEXT("烟感已报警 · 请和住户前往入户门外的绿色集合点"));
+        ShowToast(TEXT("烟感已报警，请和住户前往室外集合点"));
         UE_LOG(LogTemp,Display,TEXT("SAFETY_STATE detector_alarm reading=%.2f"),SmokeReading);
     }
     if(!IsSafetyActive())return;
@@ -166,6 +172,6 @@ void ACourseworkHUD::TickSafety(float DeltaSeconds)
     if(SafetySirenWave->GetAvailableAudioByteCount()<22050)SafetySirenWave->QueueAudio(SafetySirenPCM.GetData(),SafetySirenPCM.Num());
     SafetySiren->SetVolumeMultiplier(bPlayerGathered?.08f:.22f);
     const int32 NextState=bPlayerGathered&&HasResidentGathered()?3:2;
-    if(NextState==3&&SafetyState!=3){ShowToast(TEXT("两人均已到达集合点 · 可结束本次疏散演练"));UE_LOG(LogTemp,Display,TEXT("EVAC_ALL_GATHERED %.2f"),AlarmElapsed);}
+    if(NextState==3&&SafetyState!=3){ShowToast(TEXT("两人均已到达集合点，可结束疏散演练"));UE_LOG(LogTemp,Display,TEXT("EVAC_ALL_GATHERED %.2f"),AlarmElapsed);}
     SafetyState=NextState;
 }

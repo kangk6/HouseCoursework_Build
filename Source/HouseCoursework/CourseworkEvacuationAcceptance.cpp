@@ -125,7 +125,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         if(!R.DetectorShot){if(R.DetectorAt==0){SetPanel(0);R.DetectorAt=Now;return;}if(Now-R.DetectorAt<.2)return;Shot(TEXT("Evacuation_detector.png"));R.DetectorShot=true;return;}
         if(AlarmElapsed<.4f)return;SetPanel(7);
         Record(TEXT("sensor_threshold_triggers_alarm"),SmokeReading>=30&&SafetySiren->IsPlaying());
-        Record(TEXT("visible_fire_and_local_light"),SafetyFire&&SafetyFire->IsActive()&&SafetyFire->GetNumActiveParticles()>0&&SafetyFireLight&&SafetyFireLight->Intensity>200);
+        Record(TEXT("alarm_precedes_ignition"),SafetySmoke&&SafetySmoke->IsActive()&&!KitchenIncident.Ignited);
         HandleKitchenAlarm();Record(TEXT("early_finish_rejected"),SafetyState==2);
         Record(TEXT("environment_held_through_alarm"),Clock.Hour==R.FireHour&&Clock.ElapsedSimulationSeconds==R.FireElapsed&&SmartLightingScene==0&&!Ventilation->IsDisplayed());
         {const FVector Before=Player->GetActorLocation();GoToLocation(0);Record(TEXT("navigation_cannot_fake_evacuation"),FVector::Dist(Before,Player->GetActorLocation())<2);}
@@ -143,7 +143,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         if(R.Camera.IsValid()&&ResidentRouteIndex>=3){PC->SetViewTarget(Player);R.Camera->Destroy();R.Camera.Reset();}
         if(AlarmElapsed>3.2f&&!R.MapShot&&R.MapCloseAt==0){ToggleMap();SelectMapFloor(TestMode==TEXT("evacuation_upper")?1:0);R.MapCloseAt=Now+.5;return;}
         if(PanelMode==5){if(!R.MapShot&&Now>R.MapCloseAt-.3){Shot(TEXT("Evacuation_map.png"));R.MapShot=true;}if(Now<R.MapCloseAt)return;SetPanel(0);}
-        if(AlarmElapsed>7&&!R.KitchenShot)
+        if(AlarmElapsed>12&&!R.KitchenShot)
         {
             if(R.KitchenAt==0){const FVector Eye(-1990,9450,210);R.KitchenCamera=GetWorld()->SpawnActor<ACameraActor>(Eye,(AlarmLocation+FVector(0,0,55)-Eye).Rotation());if(R.KitchenCamera.IsValid())PC->SetViewTarget(R.KitchenCamera.Get());R.KitchenAt=Now;return;}
             if(Now-R.KitchenAt<.3)return;Shot(TEXT("Evacuation_kitchen_fire.png"));R.KitchenShot=true;return;
@@ -179,6 +179,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
     case 4:
         if(Now-R.StageAt<2)return;
         Record(TEXT("reset_restores_original_idle"),!EvacuatingResident&&OriginalResident.IsValid()&&!OriginalResident->IsHidden()&&OriginalResident->GetActorTransform().Equals(OriginalResidentTransform,.1f));
+        Record(TEXT("evacuation_result_does_not_claim_extinction"),(LastEvacuationResult.Contains(TEXT("火源未控制"))||LastEvacuationResult.Contains(TEXT("仍有过热"))));
         Record(TEXT("reset_clears_fire_and_light"),SafetyFire&&!SafetyFire->IsActive()&&SafetyFireLight&&SafetyFireLight->Intensity==0);
         Record(TEXT("entry_door_restored"),!IsFurnitureOpen(SafetyEntryDoor.Get()));
         Record(TEXT("completed_drill_restores_selected_scene"),SmartLightingScene==R.Scene&&SmartFixtureOverrides.Contains(TEXT("SM_TableLamp_A1_32"))&&FMath::IsNearlyEqual(GetSmartFixtureLevel(TEXT("SM_TableLamp_A1_32")),.42f,.001f));

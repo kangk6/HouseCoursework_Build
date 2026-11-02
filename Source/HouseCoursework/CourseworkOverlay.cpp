@@ -149,7 +149,7 @@ void UCourseworkOverlay::NativeTick(const FGeometry& Geometry,float DeltaTime)
     if(SafetyBanner && OwnerHUD)
     {
         SafetyBanner->SetVisibility(OwnerHUD->GetSafetyState()!=0 && OwnerHUD->GetPanel()==0?ESlateVisibility::HitTestInvisible:ESlateVisibility::Collapsed);
-        SafetyText->SetText(FText::FromString(OwnerHUD->GetSafetyStatus()+TEXT("   ·   M 查看路线   /   Tab 安全")));
+        SafetyText->SetText(FText::FromString(OwnerHUD->GetSafetyStatus()));
     }
     const bool Show=bInteractionWanted && OwnerHUD && OwnerHUD->GetPanel()==0;
     InteractionOpacity=FMath::FInterpConstantTo(InteractionOpacity,Show?1.f:0.f,DeltaTime,Show?9.f:7.f);

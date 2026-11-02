@@ -108,7 +108,7 @@ public:
         if(Mode==9&&Owner->GetComfortPage()==0){SyncTimeDraft();Add(780,725,1070,777,624);Add(1250,725,1460,777,626);for(int32 I=0;I<3;++I)Add(300+128*I,453,420+128*I,501,630+I);if(!Owner->IsSafetyDrillRunning())Add(300,680,550,732,621);}
         if(Mode==1) for(int32 I=0;I<6;++I) Add(300,288+I*64,682,347+I*64,300+I);
         if(Mode==4){Add(296,325,690,395,220);Add(296,496,690,566,221);Add(300,640,480,692,216);Add(520,640,730,692,305);}
-        if(Mode==7){Add(300,585,560,641,!Owner->IsSafetyDrillRunning()?400:Owner->GetSafetyState()==3?401:402);if(Owner->IsSafetyDrillRunning())Add(300,695,560,751,403);}
+        if(Mode==7){Add(300,585,560,641,!Owner->IsSafetyDrillRunning()?400:Owner->CanFinishSafety()?401:402);if(Owner->GetSafetyState()>=2)Add(300,695,560,751,403);}
         return H;
     }
     int32 Hit(FVector2D P) const { if(Owner.IsValid()&&Owner->GetPanel()==9&&Owner->GetComfortPage()==0){const float R=FVector2D::Distance(P,FVector2D(930,440));if(R>=140&&R<=258)return 600;}for(const auto& H:Targets()) if(H.Rect.ContainsPoint(P))return H.Action;return INDEX_NONE; }
@@ -451,24 +451,19 @@ public:
         else if(Mode==7)
         {
             const int32 State=Owner->GetSafetyState();const bool Running=Owner->IsSafetyDrillRunning();
-            const FLinearColor Alert(.93f,.39f,.22f),Safe(.52f,.72f,.61f),StatusColor=State==3?Safe:State>=2?Alert:Gold;
+            const FLinearColor Alert(.93f,.39f,.22f),Safe(.52f,.72f,.61f),StatusColor=Owner->GetSafetyHazardStatus()==TEXT("预警已解除")?Safe:State>=2?Alert:Gold;
             Text(56,215,TEXT("厨房"),22,Ivory);
             Text(300,197,TEXT("疏散演练"),34,Ivory,true);
             Box(300,352,4,42,StatusColor);Text(323,347,Owner->GetSafetyStatus(),22,StatusColor);
-            const TCHAR* Steps[]={TEXT("01  烟感监测"),TEXT("02  报警"),TEXT("03  人员撤离"),TEXT("04  集合")};
-            for(int32 I=0;I<4;++I)
-            {
-                const float X=300+136.f*I;const bool Reached=Running&&(I==0||(I<3&&State>=2)||(I==3&&State==3));
-                Box(X,440,124,2,Reached?StatusColor:FLinearColor(.20f,.22f,.23f));
-                Text(X,459,Steps[I],14,Reached?Ivory:Muted);
-            }
-            Box(300,519,530,4,FLinearColor(.20f,.22f,.23f));Box(300,519,530*Owner->GetSafetyProgress(),4,StatusColor);
-            const int32 Action=!Running?400:State==3?401:402;
-            const FString ActionText=!Running?TEXT("启动演练"):State==3?TEXT("结束演练"):TEXT("中止演练");
+            Text(300,413,TEXT("加热回路"),16,Muted);Text(605,413,Owner->GetSafetyDeviceStatus(),18,Ivory);
+            Text(300,459,TEXT("厨房"),16,Muted);Text(605,459,Owner->GetSafetyHazardStatus(),18,StatusColor);
+            Text(300,505,TEXT("烟感"),16,Muted);Text(605,505,State>=2?TEXT("报警中"):TEXT("监测中"),18,State>=2?Alert:Ivory);
+            const int32 Action=!Running?400:Owner->CanFinishSafety()?401:402;
+            const FString ActionText=!Running?TEXT("启动演练"):Owner->CanFinishSafety()?TEXT("结束演练"):TEXT("中止演练");
             Rect(300,585,260,56,Hover==Action?Gold:Muted);CenterText(FSlateRect(300,585,560,641),ActionText,18,Ivory);
-            if(Running)Text(300,711,TEXT("查看疏散路线  →"),18,Hover==403?Gold:Ivory);
-            if(!Running&&!Owner->GetLastEvacuationResult().IsEmpty())Text(300,710,Owner->GetLastEvacuationResult(),15,Muted);
-            if(Running){
+            if(State>=2)Text(300,711,TEXT("查看疏散路线  →"),18,Hover==403?Gold:Ivory);
+            if(!Running&&!Owner->GetLastEvacuationResult().IsEmpty())Text(300,675,Owner->GetLastEvacuationResult(),15,Muted);
+            if(State>=2){
             Box(1000,260,508,460,FLinearColor(.012f,.016f,.020f,.94f));
             Text(1032,291,TEXT("人员清点"),25,Ivory,true);
             Text(1032,365,TEXT("你的状态"),14,Muted);

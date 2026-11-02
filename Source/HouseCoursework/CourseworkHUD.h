@@ -5,6 +5,7 @@
 #include "CourseworkSolarModel.h"
 #include "CourseworkWeatherModel.h"
 #include "GameFramework/HUD.h"
+#include "CourseworkKitchenIncident.h"
 #include "CourseworkHUD.generated.h"
 class UCourseworkOverlay;
 class UStaticMeshComponent;
@@ -129,6 +130,10 @@ public:
     bool IsSafetyActive() const { return SafetyState>=2; }
     bool IsSafetyDrillRunning() const { return SafetyState!=0; }
     bool IsSafetyReady() const;
+    bool CanFinishSafety()const;
+    bool IsolateKitchenHeat();
+    FString GetSafetyDeviceStatus()const;
+    FString GetSafetyHazardStatus()const;
     FString GetSafetyStatus() const;
     float GetSafetyProgress() const;
     FVector GetAlarmLocation() const { return AlarmLocation; }
@@ -275,6 +280,16 @@ private:
     void QueueLightingSave();
     void TickLightingStateAcceptance();
     void InitializeSafety();
+    void InitializeSafetyIsolator();
+    bool SetSafetyTarget(const FHitResult& Hit);
+    void UpdateSafetyIsolator();
+    void TickSafetyResponseAcceptance();
+    FCourseworkKitchenIncident KitchenIncident;
+    float SafetyAlarmAt=-1;
+    bool bTargetSafetyIsolator=false;
+    UPROPERTY() TObjectPtr<AActor> SafetyIsolator;
+    UPROPERTY() TObjectPtr<class UStaticMeshComponent> SafetyIsolatorLever;
+    UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> SafetyIsolatorSignal;
     void TickSafety(float DeltaSeconds);
     void InitializeEvacuation();
     void BeginResidentEvacuation();
