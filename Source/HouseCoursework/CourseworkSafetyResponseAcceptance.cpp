@@ -2,6 +2,8 @@
 #include "CourseworkOverlay.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/AudioComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -11,6 +13,7 @@
 #include "UnrealClient.h"
 #include "TimerManager.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Camera/CameraActor.h"
 #include "Components/BoxComponent.h"
 #include "Engine/World.h"
 
@@ -21,6 +24,11 @@ void ACourseworkHUD::TickSafetyResponseAcceptance()
  auto* PC=GetOwningPlayerController();auto* P=Cast<ACharacter>(PC->GetPawn());const double Now=GetWorld()->GetRealTimeSeconds();
  auto Check=[&](const TCHAR* Name,bool Good){TestResults.Add(FString::Printf(TEXT("{\"case\":\"%s\",\"passed\":%s}"),Name,Good?TEXT("true"):TEXT("false")));UE_LOG(LogTemp,Display,TEXT("SAFETY_RESPONSE %s"),*TestResults.Last());};
  auto Shot=[&](const TCHAR* Name){const FString Path=FPaths::ProjectSavedDir()/TEXT("Screenshots/")+Name;FTimerHandle H;GetWorld()->GetTimerManager().SetTimer(H,[Path](){FScreenshotRequest::RequestScreenshot(Path,true,false);},.3f,false);};
+ auto SourceShot=[&](const TCHAR* Name)
+ {
+  const FVector Eye(-1930,9585,220);auto* Camera=GetWorld()->SpawnActor<ACameraActor>(Eye,(AlarmLocation+FVector(-35,0,12)-Eye).Rotation());PC->SetViewTarget(Camera);Shot(Name);
+  FTimerHandle H;GetWorld()->GetTimerManager().SetTimer(H,[PC,P,Camera](){PC->SetViewTarget(P);Camera->Destroy();},.8f,false);
+ };
  if(TestCase<0)
  {
   TestCase=0;R=FRun();R.At=Now;SetPanel(0);R.On=RoomLightOn;R.Levels=RoomBrightness;
@@ -41,7 +49,7 @@ void ACourseworkHUD::TickSafetyResponseAcceptance()
  if(Now-R.At<Wait)return;R.At=Now;
  switch(R.Stage++)
  {
- case 0:Check(TEXT("native_start_button_starts_heating"),Overlay->ExerciseControlPointer({400,613})&&SafetyState==1&&!KitchenIncident.Isolated);SetPanel(0);break;
+ case 0:Check(TEXT("native_start_button_starts_heating"),Overlay->ExerciseControlPointer({400,613})&&SafetyState==1&&!KitchenIncident.Isolated);SetPanel(0);SourceShot(TEXT("SafetyPolish_heating.png"));break;
  case 1:
  {
   const FVector Target=SafetyIsolator->GetActorLocation(),Normal=SafetyIsolator->GetActorForwardVector();
@@ -53,19 +61,22 @@ void ACourseworkHUD::TickSafetyResponseAcceptance()
   P->SetActorLocation(Near,false);PC->SetControlRotation((Target-P->GetPawnViewLocation()).Rotation());PC->PlayerCameraManager->UpdateCamera(0);
   auto* Barrier=GetWorld()->SpawnActor<AActor>();auto* Box=NewObject<UBoxComponent>(Barrier);Barrier->SetRootComponent(Box);Barrier->AddInstanceComponent(Box);Box->SetBoxExtent({20,20,60});Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);Box->SetCollisionResponseToAllChannels(ECR_Ignore);Box->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);Box->RegisterComponent();Box->SetWorldLocation(Target+Normal*60);
   UpdateInteraction();BeginInteract();EndInteract();Check(TEXT("occluded_switch_cannot_be_operated"),!KitchenIncident.Isolated);Barrier->Destroy();
-  UpdateInteraction();Check(TEXT("switch_has_native_e_target"),bTargetSafetyIsolator&&TargetLightRoom==INDEX_NONE);
+  Check(TEXT("heating_glow_visible_before_isolation"),SafetyHeatLight&&SafetyHeatLight->Intensity>0&&!SafetyHeatLight->GetOwner()->IsHidden());
+  Check(TEXT("equipment_nameplate_has_render_target"),SafetyIsolator->FindComponentByClass<UWidgetComponent>()&&SafetyIsolator->FindComponentByClass<UWidgetComponent>()->GetRenderTarget());
+    UpdateInteraction();Check(TEXT("switch_has_native_e_target"),bTargetSafetyIsolator&&TargetLightRoom==INDEX_NONE);
   BeginInteract();EndInteract();R.Cut=KitchenIncident.IsolationAt;
   Check(TEXT("native_e_isolates_heating"),KitchenIncident.Isolated&&R.Cut>=0);
   Check(TEXT("switch_lever_physically_changes_position"),SafetyIsolatorLever->GetRelativeLocation().Z<0);Shot(TEXT("SafetyResponse_isolated.png"));break;
  }
  case 2:
   Check(TEXT("early_native_action_prevents_fire"),!KitchenIncident.Ignited&&(!SafetyFire||!SafetyFire->IsActive()));
+  Check(TEXT("source_glow_off_after_isolation"),SafetyHeatLight&&SafetyHeatLight->Intensity==0);
   Check(TEXT("native_residual_smoke_clears"),KitchenIncident.Cleared()&&SmokeReading<3);
   Check(TEXT("early_clear_can_finish_without_fake_evacuation"),CanFinishSafety()&&!EvacuatingResident);SetPanel(7);Shot(TEXT("SafetyResponse_early_clear.png"));break;
  case 3:
   Check(TEXT("native_finish_button_accepts_early_clear"),Overlay->ExerciseControlPointer({400,613})&&SafetyState==0);
   Check(TEXT("early_result_records_prevention"),LastEvacuationResult.Contains(TEXT("未发生起火"))&&LastEvacuationResult.Contains(TEXT("报警前")));
-  Check(TEXT("reset_rearms_lever_and_source"),!KitchenIncident.Isolated&&SafetyIsolatorLever->GetRelativeLocation().Z>0);Shot(TEXT("SafetyResponse_early_result.png"));break;
+  Check(TEXT("reset_rearms_lever_and_source"),!KitchenIncident.Isolated&&SafetyIsolatorLever->GetRelativeLocation().Z>0&&SafetyHeatLight->Intensity==0);Shot(TEXT("SafetyResponse_early_result.png"));break;
  case 4:SetPanel(0);TriggerKitchenAlarm();break;
  case 5:
   Check(TEXT("native_alarm_and_fire_develop_without_intervention"),SafetyState>=2&&KitchenIncident.Ignited&&SafetyFire->IsActive()&&SafetySiren->IsPlaying());

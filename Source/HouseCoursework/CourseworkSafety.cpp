@@ -47,6 +47,14 @@ void ACourseworkHUD::InitializeSafety()
     SafetyFireLight=NewObject<UPointLightComponent>(this);SafetyFireLight->SetMobility(EComponentMobility::Movable);
     SafetyFireLight->SetLightColor(FLinearColor(1.f,.23f,.035f));SafetyFireLight->SetAttenuationRadius(270);SafetyFireLight->SetCastShadows(true);
     SafetyFireLight->SetIntensity(0);SafetyFireLight->RegisterComponent();SafetyFireLight->SetWorldLocation(AlarmLocation+FVector(-35,0,35));
+    auto* HeatingRig=GetWorld()->SpawnActor<AActor>();
+    SafetyHeatLight=NewObject<UPointLightComponent>(HeatingRig);SafetyHeatLight->SetMobility(EComponentMobility::Movable);
+    SafetyHeatLight->SetLightColor(FLinearColor(1.f,.065f,.008f));SafetyHeatLight->SetAttenuationRadius(65);SafetyHeatLight->SetCastShadows(false);SafetyHeatLight->SetIntensity(0);SafetyHeatLight->RegisterComponent();SafetyHeatLight->SetWorldLocation(AlarmLocation+FVector(-49,0,15));
+    auto* Pilot=NewObject<UStaticMeshComponent>(HeatingRig);HeatingRig->AddInstanceComponent(Pilot);Pilot->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube")));
+    SafetyHeatSignal=UMaterialInstanceDynamic::Create(LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Coursework/Safety/M_SensorSignal.M_SensorSignal")),this);Pilot->SetMaterial(0,SafetyHeatSignal);
+    Pilot->SetCollisionEnabled(ECollisionEnabled::NoCollision);Pilot->SetCanEverAffectNavigation(false);Pilot->SetCastShadow(false);Pilot->RegisterComponent();FVector PilotPosition=AlarmLocation+FVector(-47,25,-8);FHitResult Front;FCollisionQueryParams Surface(SCENE_QUERY_STAT(HeatingPilotSurface),true);Surface.AddIgnoredActor(GetOwningPlayerController()->GetPawn());
+    if(GetWorld()->LineTraceSingleByChannel(Front,{AlarmLocation.X-180,AlarmLocation.Y+25,AlarmLocation.Z-8},{AlarmLocation.X+80,AlarmLocation.Y+25,AlarmLocation.Z-8},ECC_Visibility,Surface)&&Front.ImpactNormal.X<-.7f){PilotPosition=Front.ImpactPoint+Front.ImpactNormal*1.2f;SafetyHeatLight->SetWorldLocation(PilotPosition+Front.ImpactNormal*7+FVector(0,0,6));}
+    UE_LOG(LogTemp,Display,TEXT("SAFETY_HEAT_PILOT position=%s surface=%s"),*PilotPosition.ToString(),*GetNameSafe(Front.GetActor()));Pilot->SetWorldLocation(PilotPosition);Pilot->SetWorldScale3D({.008f,.04f,.015f});SafetyHeatSignal->SetVectorParameterValue(TEXT("SignalColor"),FLinearColor::Black);
     // Original, synthesized two-tone chime. Mono 16-bit / 22050 Hz, 2 s loop.
     constexpr int32 Rate=22050,SampleCount=Rate*2;
     SafetySirenPCM.SetNumUninitialized(SampleCount*2);
@@ -122,6 +130,8 @@ void ACourseworkHUD::ResetKitchenAlarm(bool ResumeEnvironment)
     if(SafetySmoke)SafetySmoke->DeactivateImmediate();
     if(SafetyFire)SafetyFire->DeactivateImmediate();
     if(SafetyFireLight)SafetyFireLight->SetIntensity(0);
+    if(SafetyHeatLight)SafetyHeatLight->SetIntensity(0);
+    if(SafetyHeatSignal)SafetyHeatSignal->SetVectorParameterValue(TEXT("SignalColor"),FLinearColor::Black);
     if(SafetySiren)SafetySiren->Stop();
     if(SafetySirenWave)SafetySirenWave->ResetAudio();
     if(IsValid(AssemblyMarker))AssemblyMarker->SetActorHiddenInGame(true);
@@ -153,8 +163,10 @@ void ACourseworkHUD::TickSafety(float DeltaSeconds)
     }
     if(!IsSafetyDrillRunning())return;
     KitchenIncident.Advance(DeltaSeconds);SmokeReading=KitchenIncident.Sensor;SafetySmokeLevel=KitchenIncident.Smoke/100.f;
-    if(SafetySmoke)SafetySmoke->SetRelativeScale3D(FVector(.25f+.85f*SafetySmokeLevel));
-    if(SafetySmokeMaterial)SafetySmokeMaterial->SetScalarParameterValue(TEXT("SmokeOpacity"),.52f*SafetySmokeLevel);
+    if(SafetySmoke)SafetySmoke->SetRelativeScale3D(FVector(.38f+.72f*SafetySmokeLevel));
+    if(SafetySmokeMaterial)SafetySmokeMaterial->SetScalarParameterValue(TEXT("SmokeOpacity"),.52f*FMath::Sqrt(SafetySmokeLevel));
+    if(SafetyHeatLight)SafetyHeatLight->SetIntensity(KitchenIncident.Isolated?0.f:45.f*FMath::Clamp(KitchenIncident.Heat,0.f,1.f));
+    if(SafetyHeatSignal)SafetyHeatSignal->SetVectorParameterValue(TEXT("SignalColor"),KitchenIncident.Isolated?FLinearColor::Black:FLinearColor(.9f,.08f,.008f));
     const float FireStrength=KitchenIncident.Fire;
     if(KitchenIncident.Ignited&&SafetyFire&&!SafetyFire->IsActive()){SafetyFire->SetComponentTickEnabled(true);SafetyFire->ActivateSystem(true);}
     if(SafetyFire)SafetyFire->SetRelativeScale3D(FVector(.24f+.36f*FireStrength));

@@ -300,6 +300,8 @@ private:
     UPROPERTY() TObjectPtr<class UParticleSystem> SafetyFireTemplate;
     UPROPERTY() TObjectPtr<class UParticleSystemComponent> SafetyFire;
     UPROPERTY() TObjectPtr<class UPointLightComponent> SafetyFireLight;
+    UPROPERTY() TObjectPtr<class UPointLightComponent> SafetyHeatLight;
+    UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> SafetyHeatSignal;
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> SafetySmokeMaterial;
     UPROPERTY() TObjectPtr<class UBlendSpace1D> ResidentLocomotion;
     UPROPERTY() TObjectPtr<class UParticleSystemComponent> SafetySmoke;
