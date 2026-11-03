@@ -509,6 +509,7 @@ void ACourseworkHUD::TickAcceptanceTest()
 {
     if(TestMode==TEXT("environment_regression")){TickEnvironmentRegression();return;}
     if(TestMode==TEXT("smart_lighting")){TickSmartLightingAcceptance();return;}
+    if(TestMode==TEXT("fire_spread")){TickFireSpreadAcceptance();return;}
     if(TestMode==TEXT("safety_response")){TickSafetyResponseAcceptance();return;}
     if(TestMode==TEXT("celestial")){TickCelestialAcceptance();return;}
     if(TestMode==TEXT("night_guidance")){TickNightGuidanceAcceptance();return;}

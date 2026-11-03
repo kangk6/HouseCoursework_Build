@@ -284,6 +284,13 @@ private:
     bool SetSafetyTarget(const FHitResult& Hit);
     void UpdateSafetyIsolator();
     void TickSafetyResponseAcceptance();
+    void TickFireSpreadAcceptance();
+    void InitializeFireSpread();
+    void UpdateFireSpread();
+    void ResetFireSpread();
+    UPROPERTY() TArray<TObjectPtr<class UParticleSystemComponent>> SpreadFires;
+    UPROPERTY() TArray<TObjectPtr<class UPointLightComponent>> SpreadLights;
+    UPROPERTY() TObjectPtr<class UParticleSystemComponent> SpreadSmoke;
     FCourseworkKitchenIncident KitchenIncident;
     float SafetyAlarmAt=-1;
     bool bTargetSafetyIsolator=false;

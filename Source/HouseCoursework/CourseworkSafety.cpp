@@ -44,7 +44,8 @@ void ACourseworkHUD::InitializeSafety()
         SafetyFire=UGameplayStatics::SpawnEmitterAtLocation(GetWorld(),SafetyFireTemplate,AlarmLocation+FVector(-35,0,3),FRotator::ZeroRotator,FVector(.3f),false,EPSCPoolMethod::None,false);
         if(SafetyFire)SafetyFire->SetComponentTickEnabled(false);
     }
-    SafetyFireLight=NewObject<UPointLightComponent>(this);SafetyFireLight->SetMobility(EComponentMobility::Movable);
+    auto* FireRig=GetWorld()->SpawnActor<AActor>();
+    SafetyFireLight=NewObject<UPointLightComponent>(FireRig);SafetyFireLight->SetMobility(EComponentMobility::Movable);
     SafetyFireLight->SetLightColor(FLinearColor(1.f,.23f,.035f));SafetyFireLight->SetAttenuationRadius(270);SafetyFireLight->SetCastShadows(true);
     SafetyFireLight->SetIntensity(0);SafetyFireLight->RegisterComponent();SafetyFireLight->SetWorldLocation(AlarmLocation+FVector(-35,0,35));
     auto* HeatingRig=GetWorld()->SpawnActor<AActor>();
@@ -73,7 +74,7 @@ void ACourseworkHUD::InitializeSafety()
     SafetySiren->bAutoActivate=false;SafetySiren->bAutoDestroy=false;SafetySiren->bIsUISound=false;
     SafetySiren->SetSound(SafetySirenWave);SafetySiren->SetVolumeMultiplier(.22f);
     SafetySiren->RegisterComponent();
-    InitializeEvacuation();InitializeSafetyIsolator();
+    InitializeEvacuation();InitializeSafetyIsolator();InitializeFireSpread();
     UE_LOG(LogTemp,Display,TEXT("SAFETY_READY smoke=%d audio=%d location=%s"),SafetySmoke!=nullptr,SafetySiren!=nullptr,*AlarmLocation.ToString());
 }
 
@@ -129,6 +130,7 @@ void ACourseworkHUD::ResetKitchenAlarm(bool ResumeEnvironment)
     KitchenIncident=FCourseworkKitchenIncident();SafetyAlarmAt=-1;UpdateSafetyIsolator();
     if(SafetySmoke)SafetySmoke->DeactivateImmediate();
     if(SafetyFire)SafetyFire->DeactivateImmediate();
+    ResetFireSpread();
     if(SafetyFireLight)SafetyFireLight->SetIntensity(0);
     if(SafetyHeatLight)SafetyHeatLight->SetIntensity(0);
     if(SafetyHeatSignal)SafetyHeatSignal->SetVectorParameterValue(TEXT("SignalColor"),FLinearColor::Black);
@@ -169,8 +171,9 @@ void ACourseworkHUD::TickSafety(float DeltaSeconds)
     if(SafetyHeatSignal)SafetyHeatSignal->SetVectorParameterValue(TEXT("SignalColor"),KitchenIncident.Isolated?FLinearColor::Black:FLinearColor(.9f,.08f,.008f));
     const float FireStrength=KitchenIncident.Fire;
     if(KitchenIncident.Ignited&&SafetyFire&&!SafetyFire->IsActive()){SafetyFire->SetComponentTickEnabled(true);SafetyFire->ActivateSystem(true);}
-    if(SafetyFire)SafetyFire->SetRelativeScale3D(FVector(.24f+.36f*FireStrength));
+    if(SafetyFire)SafetyFire->SetRelativeScale3D(FVector(.35f+.60f*FireStrength));
     if(SafetyFireLight){const float T=GetWorld()->GetTimeSeconds();SafetyFireLight->SetIntensity((FireStrength>0?250.f+550.f*FireStrength:0.f)*(.8f+.13f*FMath::Sin(T*11.7f)+.07f*FMath::Sin(T*23.1f)));}
+    UpdateFireSpread();
     if(SafetyState==1&&SmokeReading>=30.f)
     {
         SafetyState=2;SafetyAlarmAt=KitchenIncident.Elapsed;AlarmElapsed=0;BeginResidentEvacuation();
