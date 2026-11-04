@@ -126,8 +126,9 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);Mesh->VisibilityBasedAnimTickOption=EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
         Mesh->PlayAnimation(ResidentLocomotion,true);
         auto* Movement=EvacuatingResident->GetCharacterMovement();Movement->bRunPhysicsWithNoController=true;
-        Movement->MaxWalkSpeed=180;Movement->MaxAcceleration=650;Movement->BrakingDecelerationWalking=1000;Movement->MaxStepHeight=24;
-        Movement->bOrientRotationToMovement=true;Movement->RotationRate=FRotator(0,300,0);Movement->SetMovementMode(MOVE_Walking);
+        Movement->MaxWalkSpeed=160;Movement->MaxAcceleration=360;Movement->BrakingDecelerationWalking=550;Movement->MaxStepHeight=24;
+        Movement->bOrientRotationToMovement=false;Movement->RotationRate=FRotator(0,180,0);Movement->SetMovementMode(MOVE_Walking);
+        EvacuatingResident->SetActorRotation((ResidentRoute[0]-EvacuatingResident->GetActorLocation()).GetSafeNormal2D().Rotation());
         ResidentLastPosition=EvacuatingResident->GetActorLocation();ResidentEvacuationState=2;
         UE_LOG(LogTemp,Display,TEXT("EVAC_RESIDENT spawned %s"),*ResidentLastPosition.ToString());
     }
@@ -136,8 +137,12 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
     if(ResidentRouteIndex<ResidentRoute.Num())
     {
         FVector Direction=ResidentRoute[ResidentRouteIndex]-Position;Direction.Z=0;
-        const float ArrivalRadius=ResidentRouteIndex<4?4.f:22.f;
-        if(Direction.Size()<ArrivalRadius&&FMath::Abs(Position.Z-ResidentRoute[ResidentRouteIndex].Z)<50)
+        const float ArrivalRadius=ResidentRouteIndex<4?8.f:22.f;
+        const FVector Previous=ResidentRouteIndex>0?ResidentRoute[ResidentRouteIndex-1]:OriginalResidentTransform.GetLocation();
+        const FVector Segment=(ResidentRoute[ResidentRouteIndex]-Previous).GetSafeNormal2D();
+        const float PassRadius=FMath::Max(28.f,Movement->Velocity.Size2D()*FMath::Min(DeltaSeconds,.35f)+ArrivalRadius);
+        const bool Passed=ResidentRouteIndex<ResidentRoute.Num()-1&&Direction.Size()<PassRadius&&FVector::DotProduct(Position-ResidentRoute[ResidentRouteIndex],Segment)>=0;
+        if((Direction.Size()<ArrivalRadius||Passed)&&FMath::Abs(Position.Z-ResidentRoute[ResidentRouteIndex].Z)<50)
         {
             UE_LOG(LogTemp,Display,TEXT("EVAC_WAYPOINT %d %s"),ResidentRouteIndex,*Position.ToString());
             ++ResidentRouteIndex;
@@ -161,7 +166,15 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         }
         if(!WaitingForDoor)
         {
-            Movement->MaxWalkSpeed=FMath::Clamp(float(Direction.Size())*4.f,20.f,180.f);
+            // Intermediate collinear markers must not produce a stop/start gait.
+            const bool Final=ResidentRouteIndex==ResidentRoute.Num()-1;
+            float Pace=Final?FMath::Clamp(float(Direction.Size())*2.5f,25.f,160.f):160.f;
+            if(!Final)
+            {
+                const FVector Next=(ResidentRoute[ResidentRouteIndex+1]-ResidentRoute[ResidentRouteIndex]).GetSafeNormal2D();
+                if(FVector::DotProduct(Direction.GetSafeNormal2D(),Next)<.7f)Pace=FMath::Lerp(85.f,160.f,FMath::Clamp(float(Direction.Size())/90.f,0.f,1.f));
+            }
+            Movement->MaxWalkSpeed=Pace;
             FVector Steer=Direction.GetSafeNormal();
             if(Player&&FVector::Dist2D(Position,Player->GetActorLocation())<110&&FVector::DotProduct((Player->GetActorLocation()-Position).GetSafeNormal2D(),Steer)>.3f)
             {
@@ -172,7 +185,11 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
                     if(!GetWorld()->SweepSingleByChannel(Hit,Position,Position+Detour*70,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(20,84),Query)){Steer=Detour;break;}
                 }
             }
-            EvacuatingResident->AddMovementInput(Steer,1.f,true);
+            const FRotator Facing=FMath::RInterpConstantTo(EvacuatingResident->GetActorRotation(),Steer.Rotation(),DeltaSeconds,180.f);
+            EvacuatingResident->SetActorRotation(FRotator(0,Facing.Yaw,0));
+            const float Alignment=FVector::DotProduct(EvacuatingResident->GetActorForwardVector(),Steer);
+            // Finish turning before taking a full stride in the new direction.
+            EvacuatingResident->AddMovementInput(Steer,FMath::Clamp((Alignment-.15f)/.70f,0.f,1.f),true);
             if(FVector::Dist2D(Position,ResidentLastPosition)<.3f)ResidentStuckTime+=DeltaSeconds;else ResidentStuckTime=0;
             const int32 Next=ResidentStuckTime>2?4:2;
             if(Next==4&&ResidentEvacuationState!=4)
@@ -185,7 +202,7 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         }
         else {Movement->StopMovementImmediately();ResidentStuckTime=0;}
         const float Speed=Movement->Velocity.Size2D();const bool Running=Speed>15;
-        if(auto* Animation=EvacuatingResident->GetMesh()->GetSingleNodeInstance())Animation->SetBlendSpacePosition(FVector(Speed,0,0));
+        if(auto* Animation=EvacuatingResident->GetMesh()->GetSingleNodeInstance()){Animation->SetBlendSpacePosition(FVector(FMath::Clamp(Speed*170.f/160.f,0.f,170.f),0,0));Animation->SetPlayRate(Speed<15?1.f:160.f/170.f);}
         bResidentRunning=Running;
         ResidentLastPosition=Position;
     }

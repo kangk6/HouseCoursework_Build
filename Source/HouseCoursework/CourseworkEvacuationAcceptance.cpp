@@ -38,6 +38,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         TWeakObjectPtr<AActor> Barrier;
         TWeakObjectPtr<ACameraActor> Camera;
         TWeakObjectPtr<ACameraActor> KitchenCamera;
+        TWeakObjectPtr<ACameraActor> WalkCamera;int32 WalkFrame=0;
         double FireHour=0,FireElapsed=0;float Hour=21;bool Flow=false;int32 Scene=1;
     };
     static FRun R;
@@ -48,6 +49,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
     auto Click=[&](float X,float Y){return Overlay->ExerciseControlPointer(FVector2D(X,Y));};
     auto Finish=[&]()
     {
+        if(R.WalkCamera.IsValid()){PC->SetViewTarget(Player);R.WalkCamera->Destroy();}
         if(R.Barrier.IsValid())R.Barrier->Destroy();
         if(R.Camera.IsValid()){PC->SetViewTarget(Player);R.Camera->Destroy();}
         if(R.KitchenCamera.IsValid()){PC->SetViewTarget(Player);R.KitchenCamera->Destroy();}
@@ -98,6 +100,13 @@ void ACourseworkHUD::TickEvacuationAcceptance()
             if(GetWorld()->LineTraceSingleByChannel(Floor,P,P-FVector(0,0,160),ECC_Visibility,Query))R.Grounded &=P.Z-88>=Floor.ImpactPoint.Z-3;
             if(P.X<-2100&&P.Y>9900&&P.Y<9970)R.Grounded &=P.Z<166;
             EvacuationSamples.Add(FString::Printf(TEXT("{\"time\":%.3f,\"npc\":[%.3f,%.3f,%.3f],\"speed\":%.3f,\"waypoint\":%d,\"state\":%d,\"run_animation\":%s,\"overlap\":%s}"),AlarmElapsed,P.X,P.Y,P.Z,EvacuatingResident->GetVelocity().Size2D(),ResidentRouteIndex,ResidentEvacuationState,Running?TEXT("true"):TEXT("false"),Overlap?TEXT("true"):TEXT("false")));
+            if(R.Stage==2&&FParse::Param(FCommandLine::Get(),TEXT("HouseWalkFrames"))&&((P.X<-2100&&P.Y>9800)||P.Y<8700))
+            {
+                if(!R.WalkCamera.IsValid())R.WalkCamera=GetWorld()->SpawnActor<ACameraActor>();
+                FVector Eye=P.Y<8700?P+FVector(-170,-110,35):FVector(-2110,9840,210);
+                R.WalkCamera->SetActorLocation(Eye);R.WalkCamera->SetActorRotation((P+FVector(0,0,-15)-Eye).Rotation());PC->SetViewTarget(R.WalkCamera.Get());
+                FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/FString::Printf(TEXT("Screenshots/WalkReview/frame_%04d.png"),R.WalkFrame++),true,false);
+            }
             R.Previous=P;R.LastSample=Now;
             if(!R.Shot&&Running&&AlarmElapsed>1.6f){Shot(TEXT("Evacuation_running.png"));R.Shot=true;}
         }
