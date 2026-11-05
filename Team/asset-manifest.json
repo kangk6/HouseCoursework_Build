@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "v0.23.6-gait-polish",
+  "version": "v0.23.7-gait-continuity",
   "files": [
     {
       "path": "Content/BlankDefault/Levels/Blank_Empty.umap",
@@ -502,9 +502,9 @@
     },
     {
       "path": "Content/Coursework/ResidentMocap/A_ResidentWalk.uasset",
-      "size": 194935,
-      "sha256": "e295dcf7260a34e780a776776695034d6f1e4fb7f5584b4762c32cd6211d7322",
-      "pack": "assets-v0.23.6-gait-polish-delta.zip"
+      "size": 190711,
+      "sha256": "27ffc7e6c6d5cb0bd30419cd601b5cd1c50b814b5cf1e730c059eeadc1ccea4b",
+      "pack": "assets-v0.23.7-gait-continuity-delta.zip"
     },
     {
       "path": "Content/Coursework/ResidentMocap/BS_ResidentWalk.uasset",
@@ -14599,6 +14599,11 @@
       "name": "assets-v0.23.6-gait-polish-delta.zip",
       "size": 59111,
       "sha256": "ed8afdd5478c5d0a9efa0c0dab7c4ac4163497a1c2077e35d9323801453f3c30"
+    },
+    {
+      "name": "assets-v0.23.7-gait-continuity-delta.zip",
+      "size": 28034,
+      "sha256": "73c09ba5a2ef4399ee2e6181c1f8f1bc76d9c4be8235e2e8cc64b6353d44f1fe"
     }
   ]
 }

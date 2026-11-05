@@ -1,6 +1,7 @@
 from gltf_math import *
 import re
 from arm_clearance import SuitClearance
+from continuous_tracks import finish_cycle
 folder=Path(__file__).parent
 g=GLB(sys.argv[1]);names={n.get('name'):i for i,n in enumerate(g.nodes)};rest=g.local();rw=g.world(rest);ref=json.loads((folder/'ue_ref.json').read_text())
 def unit(v):return v/max(np.linalg.norm(v),1e-9)
@@ -72,7 +73,9 @@ for frame in indices:
  for side,s in [('Left','l'),('Right','r')]:
   for n,child,a,b in [('upperarm_'+s,'lowerarm_'+s,side+'Arm',side+'ForeArm'),('lowerarm_'+s,'hand_'+s,side+'ForeArm',side+'Hand')]:orient(n,P[frame,bi[b]]-P[frame,bi[a]],child)
   hip=pos('thigh_'+s);goal=goals[s];a=np.linalg.norm(rw[names['calf_'+s]][:3,3]-rw[names['thigh_'+s]][:3,3]);b=np.linalg.norm(rw[names['foot_'+s]][:3,3]-rw[names['calf_'+s]][:3,3]);d=np.linalg.norm(goal-hip);u=unit(goal-hip)
-  pole=(P[frame,bi[side+'Leg']]-P[frame,bi[side+'UpLeg']])*scale;pole=unit(pole-u*(pole@u));x=(a*a-b*b+d*d)/(2*d);knee=hip+u*x+pole*np.sqrt(max(0,a*a-x*x))
+  # Captured thigh direction becomes nearly collinear with the target leg
+  # around full extension. An anatomical forward pole cannot flip hemispheres.
+  forward=np.array([.035 if s=='l' else -.035,0,1]);pole=unit(forward-u*(forward@u));x=(a*a-b*b+d*d)/(2*d);knee=hip+u*x+pole*np.sqrt(max(0,a*a-x*x))
   orient('thigh_'+s,knee-hip,'calf_'+s);v=rw[names['foot_'+s]][:3,3]-rw[names['calf_'+s]][:3,3];update('calf_'+s,rotation=between(v,goal-knee)*R.from_matrix(rw[names['calf_'+s]][:3,:3]));update('foot_'+s,position=goal,rotation=footqs[s])
  # Preserve the capture's swing, but solve hands outside the actual suit shell.
  cloth=suit.skin(suit.cloth,g.world(loc))
@@ -85,7 +88,9 @@ for frame in indices:
    if np.linalg.norm(delta)>reach:goal[1]=shoulder[1]-np.sqrt(max(.001,reach*reach-flat*flat))
    d=np.linalg.norm(goal-shoulder);u=unit(goal-shoulder);pole=oldelbow-shoulder+np.array([sign*.03,0,0]);pole=unit(pole-u*(pole@u));x=(a*a-b*b+d*d)/(2*d);elbow=shoulder+u*x+pole*np.sqrt(max(0,a*a-x*x))
    orient('upperarm_'+s,elbow-shoulder,'lowerarm_'+s);orient('lowerarm_'+s,goal-elbow,'hand_'+s)
-   forearm=unit(goal-elbow);wrist=R.from_rotvec(forearm*sign*np.radians(8))*between(rw[names['hand_'+s]][:3,3]-rw[names['lowerarm_'+s]][:3,3],forearm)*R.from_matrix(rw[names['hand_'+s]][:3,:3]);update('hand_'+s,rotation=wrist)
+  # Apply the wrist convention throughout the cycle, including frames in which
+  # suit clearance needs no additional correction.
+  forearm=unit(pos('hand_'+s)-pos('lowerarm_'+s));wrist=R.from_rotvec(forearm*sign*np.radians(8))*between(rw[names['hand_'+s]][:3,3]-rw[names['lowerarm_'+s]][:3,3],forearm)*R.from_matrix(rw[names['hand_'+s]][:3,:3]);update('hand_'+s,rotation=wrist)
   arm_errors.append(suit.penetration(suit.skin(suit.hands[s],g.world(loc)),cloth,s,margin=0))
  update('head',rotation=R.from_matrix(rw[names['head']][:3,:3]))
 
@@ -96,13 +101,7 @@ for frame in indices:
   if i==68:vals[n]=ref[n];continue
   tr=C@lp[i]*100*(wrap if i in tops else 1);q=R.from_matrix(C@lq[i].as_matrix()@C).as_quat();sc=ls[i]*(wrap if i in tops else 1);vals[n]={'translation':tr.tolist(),'rotation':q.tolist(),'scale':sc.tolist()}
  out.append(vals)
-# Close the selected cycle with a six-frame blend, preserving quaternion hemisphere.
-for j in range(6):
- t=(j+1)/6;idx=len(out)-6+j
- for n in out[idx]:
-  for key in ['translation','scale']:out[idx][n][key]=(np.array(out[idx][n][key])*(1-t)+np.array(out[0][n][key])*t).tolist()
-  qa=np.array(out[idx][n]['rotation']);qb=np.array(out[0][n]['rotation']);qb*=1 if qa@qb>=0 else -1;q=qa*(1-t)+qb*t;out[idx][n]['rotation']=(q/np.linalg.norm(q)).tolist()
+out=finish_cycle(g,ref,out)
 (folder/'walk_tracks.json').write_text(json.dumps({'fps':60,'frames':out,'source':'CMU 07_01','start':start,'end':end,'scale':scale}),encoding='utf-8')
-(folder/'clearance_report.json').write_text(json.dumps({'max_hand_envelope_penetration_cm':max(arm_errors)*100,'frames':len(indices),'scope':'Captured phases, conservative torso-only suit cross-sections; native render review still required'}),encoding='utf-8')
-print('clearance cm',max(arm_errors)*100)
+print('Run audit_tracks.py to check the final fitted cycle, not intermediate corrections.')
 print('cycle',start,end,'seconds',cycle_time,'keys',count,'match',err,'scale',scale)

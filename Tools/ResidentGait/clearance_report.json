@@ -2,18 +2,80 @@
   "frames": 66,
   "torso_forward_side_degrees": {
     "mean": [
-      1.3418988914329213,
-      0.02725608616641309
+      1.6441973620689017,
+      0.1112920511525756
     ],
     "min": [
-      0.795473209450192,
-      -0.2538351153711504
+      1.022474822849076,
+      -0.1966796104108882
     ],
     "max": [
-      1.7977812518268612,
-      0.43287089674400525
+      2.2012210436053423,
+      0.552367762645715
     ]
   },
   "max_hand_torso_envelope_penetration_cm": 0,
-  "limitations": "Conservative torso cross sections of this suit, not complete garment collision; native rendering is required."
+  "continuity": {
+    "thigh_l": {
+      "max_step_degrees": 4.181686566841818,
+      "peak_acceleration_degrees_s2": 4017.8135062417405,
+      "seam_acceleration_degrees_s2": 1143.5095956909781,
+      "endpoint_difference_degrees": 0.0
+    },
+    "calf_l": {
+      "max_step_degrees": 6.3879743233304875,
+      "peak_acceleration_degrees_s2": 8477.918386788015,
+      "seam_acceleration_degrees_s2": 2172.5788373410624,
+      "endpoint_difference_degrees": 0.0
+    },
+    "thigh_r": {
+      "max_step_degrees": 4.097632250084376,
+      "peak_acceleration_degrees_s2": 5626.806147244808,
+      "seam_acceleration_degrees_s2": 931.3036402770769,
+      "endpoint_difference_degrees": 0.0
+    },
+    "calf_r": {
+      "max_step_degrees": 6.654285276685156,
+      "peak_acceleration_degrees_s2": 9642.19144182683,
+      "seam_acceleration_degrees_s2": 2415.8998058206375,
+      "endpoint_difference_degrees": 0.0
+    },
+    "upperarm_l": {
+      "max_step_degrees": 3.69119330977663,
+      "peak_acceleration_degrees_s2": 2899.9737289350974,
+      "seam_acceleration_degrees_s2": 857.2148770536749,
+      "endpoint_difference_degrees": 0.0
+    },
+    "lowerarm_l": {
+      "max_step_degrees": 4.164743643325793,
+      "peak_acceleration_degrees_s2": 4765.1293129914275,
+      "seam_acceleration_degrees_s2": 1531.1985228626727,
+      "endpoint_difference_degrees": 0.0
+    },
+    "hand_l": {
+      "max_step_degrees": 2.6948295352168916e-13,
+      "peak_acceleration_degrees_s2": 1.2107929817764446e-09,
+      "seam_acceleration_degrees_s2": 8.49276987770049e-11,
+      "endpoint_difference_degrees": 0.0
+    },
+    "upperarm_r": {
+      "max_step_degrees": 2.16795804423675,
+      "peak_acceleration_degrees_s2": 1540.7686004779832,
+      "seam_acceleration_degrees_s2": 970.1367921849929,
+      "endpoint_difference_degrees": 0.0
+    },
+    "lowerarm_r": {
+      "max_step_degrees": 3.4865595392315356,
+      "peak_acceleration_degrees_s2": 3213.755015449948,
+      "seam_acceleration_degrees_s2": 1945.065022123054,
+      "endpoint_difference_degrees": 0.0
+    },
+    "hand_r": {
+      "max_step_degrees": 6.596454367106445e-14,
+      "peak_acceleration_degrees_s2": 2.732602324583885e-10,
+      "seam_acceleration_degrees_s2": 8.877570136597953e-11,
+      "endpoint_difference_degrees": 0.0
+    }
+  },
+  "limitations": "Conservative torso cross sections of this suit, not complete garment collision; native rendering is required. Local bone derivatives at 60 Hz are animation checks, not runtime FPS."
 }

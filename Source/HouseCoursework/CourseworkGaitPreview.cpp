@@ -11,19 +11,21 @@
 #include "Engine/World.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/CommandLine.h"
 #include "UnrealClient.h"
 void ACourseworkHUD::TickGaitPreview()
 {
  if(!bLightingReady)return;
- struct FRun{ASkeletalMeshActor* Actor=nullptr;ACameraActor* Camera=nullptr;FVector Point;double Start=0,Last=0;int Frame=0,Phase=0;float Min=MAX_flt,Max=-MAX_flt;};static FRun R;
+ struct FRun{ASkeletalMeshActor* Actor=nullptr;ACameraActor* Camera=nullptr;FVector Point;double Start=0,Last=0;int Frame=0,Phase=0,Step=0;float Min=MAX_flt,Max=-MAX_flt;};static FRun R;
+ const bool FrameStep=FParse::Param(FCommandLine::Get(),TEXT("HouseGaitFrameStep"));
  const TCHAR* Labels[]={TEXT("idle"),TEXT("front"),TEXT("side"),TEXT("back"),TEXT("turn_positive"),TEXT("turn_negative")};
  const double Now=GetWorld()->GetRealTimeSeconds();auto* PC=GetOwningPlayerController();
  auto BeginPhase=[&]()
  {
-  R.Start=Now;R.Frame=0;R.Actor->SetActorRotation(FRotator(0,-90,0));
+  R.Start=Now;R.Frame=0;R.Step=0;R.Actor->SetActorRotation(FRotator(0,-90,0));
   auto* Mesh=R.Actor->GetSkeletalMeshComponent();
   Mesh->PlayAnimation(R.Phase==0?ResidentIdleAnimation.Get():R.Phase<4?ResidentRunAnimation.Get():R.Phase==4?ResidentTurnPositive.Get():ResidentTurnNegative.Get(),R.Phase<4);
-  if(R.Phase>=4)Mesh->GetSingleNodeInstance()->SetPlaying(false);
+  if(R.Phase>=4||FrameStep)Mesh->GetSingleNodeInstance()->SetPlaying(false);
   const FVector Offset=R.Phase==2?FVector(0,310,100):R.Phase==3?FVector(-310,0,100):R.Phase>=4?FVector(250,220,105):FVector(310,0,100);
   const FVector Eye=R.Point+Offset;R.Camera->SetActorLocation(Eye);R.Camera->SetActorRotation((R.Point+FVector(0,0,85)-Eye).Rotation());
  };
@@ -37,16 +39,22 @@ void ACourseworkHUD::TickGaitPreview()
   auto* Source=OriginalResident->FindComponentByClass<USkeletalMeshComponent>();R.Actor=GetWorld()->SpawnActor<ASkeletalMeshActor>(R.Point,FRotator(0,-90,0));auto* Mesh=R.Actor->GetSkeletalMeshComponent();Mesh->SetSkeletalMesh(Source->GetSkeletalMeshAsset());for(int I=0;I<Source->GetNumMaterials();I++)Mesh->SetMaterial(I,Source->GetMaterial(I));Mesh->SetWorldScale3D(Source->GetComponentScale());Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);Mesh->VisibilityBasedAnimTickOption=EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
   R.Camera=GetWorld()->SpawnActor<ACameraActor>();PC->SetViewTarget(R.Camera);BeginPhase();return;
  }
- if(Now-R.Start>3.5)
+ const float Duration=FrameStep?(R.Phase==0?.6f:R.Phase<4?3.35f:1.8f):3.5f;
+ if((FrameStep?R.Step/60.f:Now-R.Start)>Duration)
  {
   if(++R.Phase==6)
   {
-   FFileHelper::SaveStringToFile(FString::Printf(TEXT("{\"views\":[\"idle\",\"front\",\"side\",\"back\",\"turn_positive\",\"turn_negative\"],\"walk_lower_toe_height_cm\":[%.3f,%.3f],\"method\":\"Native skeletal rendering on same mesh; three walk angles and synchronized two-step turns; sampled images, not a foreground FPS test\"}"),R.Min,R.Max),*(FPaths::ProjectSavedDir()/TEXT("GaitPreview.json")));
+   FFileHelper::SaveStringToFile(FString::Printf(TEXT("{\"views\":[\"idle\",\"front\",\"side\",\"back\",\"turn_positive\",\"turn_negative\"],\"walk_lower_toe_height_cm\":[%.3f,%.3f],\"fixed_60hz_pose_sampling\":%s,\"method\":\"Native skeletal rendering on same mesh. Optional frame-step mode evaluates poses at 1/60 second per rendered image, across three walk cycles per view; this is not runtime FPS.\"}"),R.Min,R.Max,FrameStep?TEXT("true"):TEXT("false")),*(FPaths::ProjectSavedDir()/TEXT("GaitPreview.json")));
    PC->SetViewTarget(PC->GetPawn());R.Camera->Destroy();R.Actor->Destroy();TestMode.Empty();QuitApplication();return;
   }
   BeginPhase();
  }
- auto* Mesh=R.Actor->GetSkeletalMeshComponent();const float Elapsed=Now-R.Start;
+ auto* Mesh=R.Actor->GetSkeletalMeshComponent();const float Elapsed=FrameStep?R.Step/60.f:Now-R.Start;
+ if(FrameStep&&R.Phase<4)
+ {
+  const float Length=R.Phase==0?ResidentIdleAnimation->GetPlayLength():ResidentRunAnimation->GetPlayLength();
+  Mesh->GetSingleNodeInstance()->SetPosition(FMath::Fmod(Elapsed,Length),false);Mesh->TickAnimation(0,false);Mesh->RefreshBoneTransforms();
+ }
  if(R.Phase>=4)
  {
   const float T=FMath::Clamp(Elapsed-.4f,0.f,1.f);const float Yaw=(R.Phase==4?90.f:-90.f)*T*T*(3-2*T);
@@ -56,5 +64,6 @@ void ACourseworkHUD::TickGaitPreview()
  {
   const float H=FMath::Min(Mesh->GetSocketLocation(TEXT("ball_l")).Z,Mesh->GetSocketLocation(TEXT("ball_r")).Z)-R.Point.Z;R.Min=FMath::Min(R.Min,H);R.Max=FMath::Max(R.Max,H);
  }
- if(Now-R.Last>.08&&Elapsed>.1&&Elapsed<3.3){R.Last=Now;FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/FString::Printf(TEXT("Screenshots/GaitPreview/%s_%03d.png"),Labels[R.Phase],R.Frame++),false,false);}
+ if((FrameStep||Now-R.Last>.08)&&Elapsed>.1&&Elapsed<(FrameStep?Duration:3.3f)){R.Last=Now;FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/FString::Printf(TEXT("Screenshots/%s/%s_%03d.png"),FrameStep?TEXT("GaitContinuity"):TEXT("GaitPreview"),Labels[R.Phase],R.Frame++),false,false);}
+ ++R.Step;
 }
