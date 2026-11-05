@@ -33,6 +33,8 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         bool RunSeen=false,NoTeleport=true,CollisionFree=true,Grounded=true,MeshGrounded=true,BlockedSeen=false,Shot=false,GatheredShot=false,MapShot=false,DetectorShot=false;
         double MapCloseAt=0,DetectorAt=0,KitchenAt=0;
         float HipMin=MAX_flt,HipMax=-MAX_flt;
+        bool HeadingSeen=false,InitialHeadingContinuous=true,YawContinuous=true,TurnStationary=true,TurnSeen=false;
+        float PreviousYaw=0,TurnTravel=0;double HeadingAt=0;FVector TurnOrigin;
         bool KitchenShot=false;
         FVector Previous=FVector::ZeroVector,MinRotation=FVector(MAX_flt),MaxRotation=FVector(-MAX_flt);
         TWeakObjectPtr<AActor> Barrier;
@@ -80,6 +82,20 @@ void ACourseworkHUD::TickEvacuationAcceptance()
     if(Now-R.Started>105){Record(TEXT("complete_before_timeout"),false);Shot(TEXT("Evacuation_failure.png"));Finish();return;}
     if(R.Stage>=2&&R.Stage<=3)
     {
+        if(EvacuatingResident)
+        {
+            const float Yaw=EvacuatingResident->GetActorRotation().Yaw;
+            if(!R.HeadingSeen)
+            {
+                const auto* Source=OriginalResident->FindComponentByClass<USkeletalMeshComponent>();
+                const float Initial=Source->GetComponentTransform().TransformVectorNoScale(FVector(0,1,0)).Rotation().Yaw;
+                R.InitialHeadingContinuous=FMath::Abs(FMath::FindDeltaAngleDegrees(Initial,Yaw))<12;
+                R.TurnOrigin=EvacuatingResident->GetActorLocation();R.HeadingSeen=true;
+            }
+            else if(Now>R.HeadingAt)R.YawContinuous &=FMath::Abs(FMath::FindDeltaAngleDegrees(R.PreviousYaw,Yaw))<=185.f*float(Now-R.HeadingAt)+1.f;
+            if(bResidentTurning){R.TurnSeen=true;R.TurnTravel=FMath::Max(R.TurnTravel,float(FVector::Dist2D(R.TurnOrigin,EvacuatingResident->GetActorLocation())));R.TurnStationary &=R.TurnTravel<2;}
+            R.PreviousYaw=Yaw;R.HeadingAt=Now;
+        }
         if(AcceptanceLastFrame>0)AcceptanceFrameTimes.Add(float((Now-AcceptanceLastFrame)*1000));AcceptanceLastFrame=Now;
         if(EvacuatingResident&&Now-R.LastSample>.2)
         {
@@ -178,6 +194,10 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         UE_LOG(LogTemp,Display,TEXT("LOCOMOTION_HIP_VERTICAL_SPAN %.3f cm"),R.HipMax-R.HipMin);
         Record(TEXT("locomotion_hip_bob_under_8cm"),R.HipMax-R.HipMin<8);
         Record(TEXT("walking_mesh_floor_gap_under_3cm"),R.MeshGrounded);
+        Record(TEXT("startup_preserves_original_heading"),R.HeadingSeen&&R.InitialHeadingContinuous);
+        Record(TEXT("yaw_changes_are_bounded"),R.YawContinuous);
+        Record(TEXT("startup_turn_precedes_translation"),R.TurnSeen&&R.TurnStationary);
+        Record(TEXT("arrival_confirmed_only_after_braking"),HasResidentGathered()&&EvacuatingResident->GetVelocity().Size2D()<5);
         Record(TEXT("npc_collision_free"),R.CollisionFree);Record(TEXT("npc_no_midroute_teleport"),R.NoTeleport);Record(TEXT("npc_not_below_floor"),R.Grounded);
         PC->SetControlRotation((GetResidentPosition()+FVector(0,0,30)-Player->GetPawnViewLocation()).Rotation());
         SetPanel(7);R.Stage=3;R.StageAt=Now;break;

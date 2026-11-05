@@ -79,6 +79,7 @@ FString ACourseworkHUD::GetResidentEvacuationStatus()const
 void ACourseworkHUD::BeginResidentEvacuation()
 {
     ResidentEvacuationState=1;ResidentWaitTime=.8f;ResidentRouteIndex=0;ResidentStuckTime=0;
+    bResidentTurning=false;bResidentSettling=false;ResidentTurnElapsed=0;ResidentSettleElapsed=0;
     ResidentRoute={FVector(-2335,9951,150),FVector(-2210,9951,150),FVector(-2100,9951,150),FVector(-2100,9870,150),FVector(-1990,9800,150),
         FVector(-1990,9170,150),FVector(-2205,9170,150),FVector(-2205,9000,150),FVector(-2205,8890,150),
         FVector(-2205,8700,AssemblyPoint.Z),AssemblyPoint+FVector(-135,0,0)};
@@ -97,6 +98,7 @@ void ACourseworkHUD::RestoreResident()
     if(bEntryOpenedByResident&&!bEntryInitiallyOpen&&SafetyEntryDoor.IsValid()&&IsFurnitureOpen(SafetyEntryDoor.Get())&&FurnitureActionRevisions.FindRef(SafetyEntryDoor.Get())==EntrySafetyRevision)
         InvokeFurniture(SafetyEntryDoor->GetOwner(),SafetyEntryDoor.Get());
     ResidentEvacuationState=0;ResidentRouteIndex=0;bResidentRunning=false;bEntryOpenedByResident=false;
+    bResidentTurning=false;bResidentSettling=false;ResidentTurnElapsed=0;ResidentSettleElapsed=0;
 }
 
 void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
@@ -116,7 +118,8 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         if(!Source||!ResidentRunAnimation){ResidentEvacuationState=5;return;}
         OriginalResident->SetActorEnableCollision(false);OriginalResident->SetActorHiddenInGame(true);Source->SetComponentTickEnabled(false);
         FActorSpawnParameters Spawn;Spawn.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        EvacuatingResident=GetWorld()->SpawnActor<ACharacter>(ACharacter::StaticClass(),OriginalResidentTransform.GetLocation()+FVector(0,0,90),FRotator::ZeroRotator,Spawn);
+        const FRotator InitialFacing=Source->GetComponentTransform().TransformVectorNoScale(FVector(0,1,0)).GetSafeNormal2D().Rotation();
+        EvacuatingResident=GetWorld()->SpawnActor<ACharacter>(ACharacter::StaticClass(),OriginalResidentTransform.GetLocation()+FVector(0,0,90),FRotator(0,InitialFacing.Yaw,0),Spawn);
         if(!EvacuatingResident){OriginalResident->SetActorHiddenInGame(false);OriginalResident->SetActorEnableCollision(true);Source->SetComponentTickEnabled(bOriginalResidentTick);ResidentEvacuationState=5;return;}
         EvacuatingResident->Tags.Add(TEXT("CourseworkEvacuatingResident"));
         auto* Capsule=EvacuatingResident->GetCapsuleComponent();Capsule->SetCapsuleSize(20,88);
@@ -129,12 +132,52 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         auto* Movement=EvacuatingResident->GetCharacterMovement();Movement->bRunPhysicsWithNoController=true;
         Movement->MaxWalkSpeed=140;Movement->MaxAcceleration=360;Movement->BrakingDecelerationWalking=550;Movement->MaxStepHeight=24;
         Movement->bOrientRotationToMovement=false;Movement->RotationRate=FRotator(0,180,0);Movement->SetMovementMode(MOVE_Walking);
-        EvacuatingResident->SetActorRotation((ResidentRoute[0]-EvacuatingResident->GetActorLocation()).GetSafeNormal2D().Rotation());
+        ResidentTurnStartYaw=InitialFacing.Yaw;
+        ResidentTurnDelta=FMath::FindDeltaAngleDegrees(InitialFacing.Yaw,(ResidentRoute[0]-EvacuatingResident->GetActorLocation()).GetSafeNormal2D().Rotation().Yaw);
+        bResidentTurning=FMath::Abs(ResidentTurnDelta)>5;ResidentTurnElapsed=0;
+        if(bResidentTurning)
+        {
+            // The fixed living-room route starts with a quarter turn. Its two
+            // foot plants are synchronized with actor yaw instead of a snap.
+            UAnimSequence* Turn=ResidentTurnDelta>0?ResidentTurnPositive:ResidentTurnNegative;
+            Mesh->PlayAnimation(Turn?Turn:ResidentIdleAnimation.Get(),false);
+            if(auto* Animation=Mesh->GetSingleNodeInstance())Animation->SetPlaying(false);
+        }
         ResidentLastPosition=EvacuatingResident->GetActorLocation();ResidentEvacuationState=2;
         UE_LOG(LogTemp,Display,TEXT("EVAC_RESIDENT spawned %s"),*ResidentLastPosition.ToString());
     }
     if(!EvacuatingResident || (ResidentEvacuationState!=2&&ResidentEvacuationState!=4))return;
     auto* Movement=EvacuatingResident->GetCharacterMovement();const FVector Position=EvacuatingResident->GetActorLocation();
+    auto UpdateLocomotion=[&]()
+    {
+        const float Speed=Movement->Velocity.Size2D();bResidentRunning=Speed>15;
+        if(auto* Animation=EvacuatingResident->GetMesh()->GetSingleNodeInstance())
+        {Animation->SetBlendSpacePosition(FVector(FMath::Clamp(Speed*170.f/140.f,0.f,170.f),0,0));Animation->SetPlayRate(Speed<15?1.f:140.f/135.62175f);}
+    };
+    if(bResidentTurning)
+    {
+        ResidentTurnElapsed=FMath::Min(1.f,ResidentTurnElapsed+DeltaSeconds);
+        const float T=ResidentTurnElapsed;const float Curve=T*T*(3-2*T);
+        EvacuatingResident->SetActorRotation(FRotator(0,ResidentTurnStartYaw+ResidentTurnDelta*Curve,0));
+        auto* Mesh=EvacuatingResident->GetMesh();
+        if(auto* Animation=Mesh->GetSingleNodeInstance()){Animation->SetPosition(T,false);Mesh->TickAnimation(0,false);Mesh->RefreshBoneTransforms();}
+        ResidentLastPosition=Position;bResidentRunning=false;
+        if(T>=1){bResidentTurning=false;Mesh->PlayAnimation(ResidentLocomotion,true);UE_LOG(LogTemp,Display,TEXT("EVAC_TURN complete delta=%.2f"),ResidentTurnDelta);}
+        return;
+    }
+    if(bResidentSettling)
+    {
+        // Leave velocity to CharacterMovement braking, with the idle blend
+        // following measured speed, before confirming the assembly arrival.
+        UpdateLocomotion();ResidentSettleElapsed=Movement->Velocity.Size2D()<5?ResidentSettleElapsed+DeltaSeconds:0;
+        if(FVector::Dist2D(Position,ResidentRoute.Last())>70){bResidentSettling=false;ResidentSettleElapsed=0;}
+        else if(ResidentSettleElapsed>=.25f)
+        {
+            ResidentEvacuationState=3;ResidentArrivalTime=AlarmElapsed;Movement->StopMovementImmediately();UpdateLocomotion();bResidentSettling=false;ResidentRouteIndex=ResidentRoute.Num();
+            UE_LOG(LogTemp,Display,TEXT("EVAC_RESIDENT gathered %.2f"),ResidentArrivalTime);
+        }
+        ResidentLastPosition=Position;return;
+    }
     if(ResidentRouteIndex<ResidentRoute.Num())
     {
         FVector Direction=ResidentRoute[ResidentRouteIndex]-Position;Direction.Z=0;
@@ -146,13 +189,11 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         if((Direction.Size()<ArrivalRadius||Passed)&&FMath::Abs(Position.Z-ResidentRoute[ResidentRouteIndex].Z)<50)
         {
             UE_LOG(LogTemp,Display,TEXT("EVAC_WAYPOINT %d %s"),ResidentRouteIndex,*Position.ToString());
-            ++ResidentRouteIndex;
-            if(ResidentRouteIndex==ResidentRoute.Num())
+            if(ResidentRouteIndex==ResidentRoute.Num()-1)
             {
-                ResidentEvacuationState=3;ResidentArrivalTime=AlarmElapsed;Movement->StopMovementImmediately();
-                if(auto* Animation=EvacuatingResident->GetMesh()->GetSingleNodeInstance())Animation->SetBlendSpacePosition(FVector::ZeroVector);bResidentRunning=false;
-                UE_LOG(LogTemp,Display,TEXT("EVAC_RESIDENT gathered %.2f"),ResidentArrivalTime);return;
+                bResidentSettling=true;ResidentSettleElapsed=0;UpdateLocomotion();return;
             }
+            ++ResidentRouteIndex;
             Direction=ResidentRoute[ResidentRouteIndex]-Position;Direction.Z=0;
         }
         bool WaitingForDoor=false;
@@ -202,9 +243,7 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
             ResidentEvacuationState=Next;
         }
         else {Movement->StopMovementImmediately();ResidentStuckTime=0;}
-        const float Speed=Movement->Velocity.Size2D();const bool Running=Speed>15;
-        if(auto* Animation=EvacuatingResident->GetMesh()->GetSingleNodeInstance()){Animation->SetBlendSpacePosition(FVector(FMath::Clamp(Speed*170.f/140.f,0.f,170.f),0,0));Animation->SetPlayRate(Speed<15?1.f:140.f/135.62175f);}
-        bResidentRunning=Running;
+        UpdateLocomotion();
         ResidentLastPosition=Position;
     }
 }

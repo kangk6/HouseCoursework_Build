@@ -312,6 +312,10 @@ private:
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> SafetyHeatSignal;
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> SafetySmokeMaterial;
     UPROPERTY() TObjectPtr<class UBlendSpace1D> ResidentLocomotion;
+    UPROPERTY() TObjectPtr<class UAnimSequence> ResidentTurnPositive;
+    UPROPERTY() TObjectPtr<class UAnimSequence> ResidentTurnNegative;
+    float ResidentTurnElapsed=0,ResidentTurnStartYaw=0,ResidentTurnDelta=0,ResidentSettleElapsed=0;
+    bool bResidentTurning=false,bResidentSettling=false;
     UPROPERTY() TObjectPtr<class UParticleSystemComponent> SafetySmoke;
     UPROPERTY() TObjectPtr<class USoundWaveProcedural> SafetySirenWave;
     UPROPERTY() TObjectPtr<class UAudioComponent> SafetySiren;

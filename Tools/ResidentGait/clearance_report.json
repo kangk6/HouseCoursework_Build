@@ -1,0 +1,19 @@
+{
+  "frames": 66,
+  "torso_forward_side_degrees": {
+    "mean": [
+      1.3418988914329213,
+      0.02725608616641309
+    ],
+    "min": [
+      0.795473209450192,
+      -0.2538351153711504
+    ],
+    "max": [
+      1.7977812518268612,
+      0.43287089674400525
+    ]
+  },
+  "max_hand_torso_envelope_penetration_cm": 0,
+  "limitations": "Conservative torso cross sections of this suit, not complete garment collision; native rendering is required."
+}

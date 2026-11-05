@@ -10,6 +10,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="Coursework|Editor")
     static FString BakeResidentMocap(const FString& JsonPath);
     UFUNCTION(BlueprintCallable, Category="Coursework|Editor")
+    static FString BakeResidentGaitClip(const FString& JsonPath, const FString& AssetName);
+    UFUNCTION(BlueprintCallable, Category="Coursework|Editor")
     static FString PrepareVentilationLeaves();
     UFUNCTION(BlueprintCallable, Category="Coursework|Editor")
     static FString PrepareCurtainWind();

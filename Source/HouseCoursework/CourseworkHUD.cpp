@@ -42,6 +42,8 @@ ACourseworkHUD::ACourseworkHUD()
     static ConstructorHelpers::FObjectFinder<UAnimSequence> Run(TEXT("/Game/Coursework/ResidentMocap/A_ResidentWalk.A_ResidentWalk"));
     static ConstructorHelpers::FObjectFinder<UAnimSequence> Idle(TEXT("/Game/Coursework/ResidentAnimated/harper-idle-linear_Anim.harper-idle-linear_Anim"));
     ResidentRunAnimation=Run.Object;ResidentIdleAnimation=Idle.Object;
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> TurnPositive(TEXT("/Game/Coursework/ResidentMocap/A_ResidentTurnPositive90.A_ResidentTurnPositive90"));ResidentTurnPositive=TurnPositive.Object;
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> TurnNegative(TEXT("/Game/Coursework/ResidentMocap/A_ResidentTurnNegative90.A_ResidentTurnNegative90"));ResidentTurnNegative=TurnNegative.Object;
 }
 
 void ACourseworkHUD::BeginPlay()

@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "v0.23.5-mocap-walk",
+  "version": "v0.23.6-gait-polish",
   "files": [
     {
       "path": "Content/BlankDefault/Levels/Blank_Empty.umap",
@@ -489,10 +489,22 @@
       "pack": "assets-v0.17.1-base-coursework.zip"
     },
     {
+      "path": "Content/Coursework/ResidentMocap/A_ResidentTurnNegative90.uasset",
+      "size": 117535,
+      "sha256": "54b414435fe0fc220e954506b345c2c2e19960943d765adfb7b9d5363cee7b49",
+      "pack": "assets-v0.23.6-gait-polish-delta.zip"
+    },
+    {
+      "path": "Content/Coursework/ResidentMocap/A_ResidentTurnPositive90.uasset",
+      "size": 117535,
+      "sha256": "d615827e69276d69c399030a035cf7de90c00e0266c51bcc0b73a81dca3d847b",
+      "pack": "assets-v0.23.6-gait-polish-delta.zip"
+    },
+    {
       "path": "Content/Coursework/ResidentMocap/A_ResidentWalk.uasset",
-      "size": 190711,
-      "sha256": "e56fe747e5d74a5ad34e78f9a3b31a5de1d4ee8fa996c694b5c223b5a7f81384",
-      "pack": "assets-v0.23.5-mocap-walk-delta.zip"
+      "size": 194935,
+      "sha256": "e295dcf7260a34e780a776776695034d6f1e4fb7f5584b4762c32cd6211d7322",
+      "pack": "assets-v0.23.6-gait-polish-delta.zip"
     },
     {
       "path": "Content/Coursework/ResidentMocap/BS_ResidentWalk.uasset",
@@ -14582,6 +14594,11 @@
       "name": "assets-v0.23.5-mocap-walk-delta.zip",
       "size": 29678,
       "sha256": "bca7c5d72b4d1ba668bf78ac6de9098856d18ed3628e471f715a087c82748642"
+    },
+    {
+      "name": "assets-v0.23.6-gait-polish-delta.zip",
+      "size": 59111,
+      "sha256": "ed8afdd5478c5d0a9efa0c0dab7c4ac4163497a1c2077e35d9323801453f3c30"
     }
   ]
 }
