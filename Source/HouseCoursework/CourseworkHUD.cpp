@@ -38,8 +38,8 @@ ACourseworkHUD::ACourseworkHUD()
     static ConstructorHelpers::FObjectFinder<UParticleSystem> Smoke(TEXT("/Game/Coursework/Safety/P_KitchenSmoke.P_KitchenSmoke"));
     SafetySmokeTemplate=Smoke.Object;
     static ConstructorHelpers::FObjectFinder<UParticleSystem> Fire(TEXT("/Game/Coursework/Safety/P_KitchenFire.P_KitchenFire"));SafetyFireTemplate=Fire.Object;
-    static ConstructorHelpers::FObjectFinder<UBlendSpace1D> Locomotion(TEXT("/Game/Coursework/ResidentBrisk/BS_ResidentEvacuation.BS_ResidentEvacuation"));ResidentLocomotion=Locomotion.Object;
-    static ConstructorHelpers::FObjectFinder<UAnimSequence> Run(TEXT("/Game/Coursework/ResidentBrisk/harper-brisk-linear_Anim.harper-brisk-linear_Anim"));
+    static ConstructorHelpers::FObjectFinder<UBlendSpace1D> Locomotion(TEXT("/Game/Coursework/ResidentMocap/BS_ResidentWalk.BS_ResidentWalk"));ResidentLocomotion=Locomotion.Object;
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> Run(TEXT("/Game/Coursework/ResidentMocap/A_ResidentWalk.A_ResidentWalk"));
     static ConstructorHelpers::FObjectFinder<UAnimSequence> Idle(TEXT("/Game/Coursework/ResidentAnimated/harper-idle-linear_Anim.harper-idle-linear_Anim"));
     ResidentRunAnimation=Run.Object;ResidentIdleAnimation=Idle.Object;
 }
@@ -509,6 +509,7 @@ void ACourseworkHUD::TickAcceptanceTest()
 {
     if(TestMode==TEXT("environment_regression")){TickEnvironmentRegression();return;}
     if(TestMode==TEXT("smart_lighting")){TickSmartLightingAcceptance();return;}
+    if(TestMode==TEXT("gait_preview")){TickGaitPreview();return;}
     if(TestMode==TEXT("fire_spread")){TickFireSpreadAcceptance();return;}
     if(TestMode==TEXT("safety_response")){TickSafetyResponseAcceptance();return;}
     if(TestMode==TEXT("celestial")){TickCelestialAcceptance();return;}

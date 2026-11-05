@@ -69,7 +69,7 @@ FString ACourseworkHUD::GetResidentEvacuationStatus()const
     switch(ResidentEvacuationState)
     {
     case 1:return TEXT("已响应报警 · 准备撤离");
-    case 2:return TEXT("正在快步撤往室外集合点");
+    case 2:return TEXT("正在撤往室外集合点");
     case 3:return FString::Printf(TEXT("已到集合点 · %.1f 秒"),ResidentArrivalTime);
     case 4:return TEXT("通道受阻 · 请让开出口");
     case 5:return TEXT("角色启动失败 · 请中止复位");
@@ -122,11 +122,12 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         auto* Capsule=EvacuatingResident->GetCapsuleComponent();Capsule->SetCapsuleSize(20,88);
         auto* Mesh=EvacuatingResident->GetMesh();Mesh->SetSkeletalMesh(Source->GetSkeletalMeshAsset());
         for(int32 I=0;I<Source->GetNumMaterials();++I)Mesh->SetMaterial(I,Source->GetMaterial(I));
-        Mesh->SetRelativeLocation(FVector(0,0,-88));Mesh->SetRelativeRotation(FRotator(0,-90,0));Mesh->SetWorldScale3D(Source->GetComponentScale());
+        // CharacterMovement keeps the capsule about 2.15 cm above the floor.
+        Mesh->SetRelativeLocation(FVector(0,0,-90.15f));Mesh->SetRelativeRotation(FRotator(0,-90,0));Mesh->SetWorldScale3D(Source->GetComponentScale());
         Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);Mesh->VisibilityBasedAnimTickOption=EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
         Mesh->PlayAnimation(ResidentLocomotion,true);
         auto* Movement=EvacuatingResident->GetCharacterMovement();Movement->bRunPhysicsWithNoController=true;
-        Movement->MaxWalkSpeed=160;Movement->MaxAcceleration=360;Movement->BrakingDecelerationWalking=550;Movement->MaxStepHeight=24;
+        Movement->MaxWalkSpeed=140;Movement->MaxAcceleration=360;Movement->BrakingDecelerationWalking=550;Movement->MaxStepHeight=24;
         Movement->bOrientRotationToMovement=false;Movement->RotationRate=FRotator(0,180,0);Movement->SetMovementMode(MOVE_Walking);
         EvacuatingResident->SetActorRotation((ResidentRoute[0]-EvacuatingResident->GetActorLocation()).GetSafeNormal2D().Rotation());
         ResidentLastPosition=EvacuatingResident->GetActorLocation();ResidentEvacuationState=2;
@@ -168,11 +169,11 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         {
             // Intermediate collinear markers must not produce a stop/start gait.
             const bool Final=ResidentRouteIndex==ResidentRoute.Num()-1;
-            float Pace=Final?FMath::Clamp(float(Direction.Size())*2.5f,25.f,160.f):160.f;
+            float Pace=Final?FMath::Clamp(float(Direction.Size())*2.5f,25.f,140.f):140.f;
             if(!Final)
             {
                 const FVector Next=(ResidentRoute[ResidentRouteIndex+1]-ResidentRoute[ResidentRouteIndex]).GetSafeNormal2D();
-                if(FVector::DotProduct(Direction.GetSafeNormal2D(),Next)<.7f)Pace=FMath::Lerp(85.f,160.f,FMath::Clamp(float(Direction.Size())/90.f,0.f,1.f));
+                if(FVector::DotProduct(Direction.GetSafeNormal2D(),Next)<.7f)Pace=FMath::Lerp(85.f,140.f,FMath::Clamp(float(Direction.Size())/90.f,0.f,1.f));
             }
             Movement->MaxWalkSpeed=Pace;
             FVector Steer=Direction.GetSafeNormal();
@@ -202,7 +203,7 @@ void ACourseworkHUD::TickEvacuation(float DeltaSeconds)
         }
         else {Movement->StopMovementImmediately();ResidentStuckTime=0;}
         const float Speed=Movement->Velocity.Size2D();const bool Running=Speed>15;
-        if(auto* Animation=EvacuatingResident->GetMesh()->GetSingleNodeInstance()){Animation->SetBlendSpacePosition(FVector(FMath::Clamp(Speed*170.f/160.f,0.f,170.f),0,0));Animation->SetPlayRate(Speed<15?1.f:160.f/170.f);}
+        if(auto* Animation=EvacuatingResident->GetMesh()->GetSingleNodeInstance()){Animation->SetBlendSpacePosition(FVector(FMath::Clamp(Speed*170.f/140.f,0.f,170.f),0,0));Animation->SetPlayRate(Speed<15?1.f:140.f/135.62175f);}
         bResidentRunning=Running;
         ResidentLastPosition=Position;
     }

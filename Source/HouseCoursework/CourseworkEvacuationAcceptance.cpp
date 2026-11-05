@@ -30,7 +30,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
     struct FRun
     {
         int32 Stage=0;double Started=0,StageAt=0,LastSample=0,DoorAt=-10;
-        bool RunSeen=false,NoTeleport=true,CollisionFree=true,Grounded=true,BlockedSeen=false,Shot=false,GatheredShot=false,MapShot=false,DetectorShot=false;
+        bool RunSeen=false,NoTeleport=true,CollisionFree=true,Grounded=true,MeshGrounded=true,BlockedSeen=false,Shot=false,GatheredShot=false,MapShot=false,DetectorShot=false;
         double MapCloseAt=0,DetectorAt=0,KitchenAt=0;
         float HipMin=MAX_flt,HipMax=-MAX_flt;
         bool KitchenShot=false;
@@ -98,7 +98,7 @@ void ACourseworkHUD::TickEvacuationAcceptance()
             R.CollisionFree &=!Overlap;
             Query.AddIgnoredActor(Player);FHitResult Floor;
             if(GetWorld()->LineTraceSingleByChannel(Floor,P,P-FVector(0,0,160),ECC_Visibility,Query))R.Grounded &=P.Z-88>=Floor.ImpactPoint.Z-3;
-            if(P.X<-2100&&P.Y>9900&&P.Y<9970)R.Grounded &=P.Z<166;
+            if(P.X<-2100&&P.Y>9900&&P.Y<9970){R.Grounded &=P.Z<166;if(Floor.bBlockingHit)R.MeshGrounded &=FMath::Abs(Mesh->GetComponentLocation().Z-Floor.ImpactPoint.Z)<3.f;}
             EvacuationSamples.Add(FString::Printf(TEXT("{\"time\":%.3f,\"npc\":[%.3f,%.3f,%.3f],\"speed\":%.3f,\"waypoint\":%d,\"state\":%d,\"run_animation\":%s,\"overlap\":%s}"),AlarmElapsed,P.X,P.Y,P.Z,EvacuatingResident->GetVelocity().Size2D(),ResidentRouteIndex,ResidentEvacuationState,Running?TEXT("true"):TEXT("false"),Overlap?TEXT("true"):TEXT("false")));
             if(R.Stage==2&&FParse::Param(FCommandLine::Get(),TEXT("HouseWalkFrames"))&&((P.X<-2100&&P.Y>9800)||P.Y<8700))
             {
@@ -176,7 +176,8 @@ void ACourseworkHUD::TickEvacuationAcceptance()
         Record(TEXT("gathering_does_not_clear_alarm"),SafetySmoke->IsActive()&&SafetySiren->IsPlaying());
         Record(TEXT("real_locomotion_animation_seen"),R.RunSeen&&(R.MaxRotation-R.MinRotation).GetMax()>8);
         UE_LOG(LogTemp,Display,TEXT("LOCOMOTION_HIP_VERTICAL_SPAN %.3f cm"),R.HipMax-R.HipMin);
-        Record(TEXT("locomotion_hip_bob_under_14cm"),R.HipMax-R.HipMin<14);
+        Record(TEXT("locomotion_hip_bob_under_8cm"),R.HipMax-R.HipMin<8);
+        Record(TEXT("walking_mesh_floor_gap_under_3cm"),R.MeshGrounded);
         Record(TEXT("npc_collision_free"),R.CollisionFree);Record(TEXT("npc_no_midroute_teleport"),R.NoTeleport);Record(TEXT("npc_not_below_floor"),R.Grounded);
         PC->SetControlRotation((GetResidentPosition()+FVector(0,0,30)-Player->GetPawnViewLocation()).Rotation());
         SetPanel(7);R.Stage=3;R.StageAt=Now;break;

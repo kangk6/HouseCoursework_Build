@@ -8,6 +8,8 @@ class HOUSECOURSEWORK_API UCourseworkTools : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 public:
     UFUNCTION(BlueprintCallable, Category="Coursework|Editor")
+    static FString BakeResidentMocap(const FString& JsonPath);
+    UFUNCTION(BlueprintCallable, Category="Coursework|Editor")
     static FString PrepareVentilationLeaves();
     UFUNCTION(BlueprintCallable, Category="Coursework|Editor")
     static FString PrepareCurtainWind();

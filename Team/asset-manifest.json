@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "v0.22.9-celestial-polish",
+  "version": "v0.23.5-mocap-walk",
   "files": [
     {
       "path": "Content/BlankDefault/Levels/Blank_Empty.umap",
@@ -487,6 +487,18 @@
       "size": 2054381,
       "sha256": "ccab4a411cc87b1e3e9a303fada0c3adf7cc0709f1bbcca723d670eded83b53e",
       "pack": "assets-v0.17.1-base-coursework.zip"
+    },
+    {
+      "path": "Content/Coursework/ResidentMocap/A_ResidentWalk.uasset",
+      "size": 190711,
+      "sha256": "e56fe747e5d74a5ad34e78f9a3b31a5de1d4ee8fa996c694b5c223b5a7f81384",
+      "pack": "assets-v0.23.5-mocap-walk-delta.zip"
+    },
+    {
+      "path": "Content/Coursework/ResidentMocap/BS_ResidentWalk.uasset",
+      "size": 3473,
+      "sha256": "7f884dda87d52ea0baa7d50d0695dc0fe375bc5b4430bbcb9218a98b757e0d74",
+      "pack": "assets-v0.23.5-mocap-walk-delta.zip"
     },
     {
       "path": "Content/Coursework/ResidentRefined/1842772f0fe6ec98.uasset",
@@ -14565,6 +14577,11 @@
       "name": "assets-v0.22.9-celestial-polish-delta.zip",
       "size": 12714,
       "sha256": "f3ebca5685b4199287aa4d11c702e4b1e275284483bff9604b2ad20ca48a190c"
+    },
+    {
+      "name": "assets-v0.23.5-mocap-walk-delta.zip",
+      "size": 29678,
+      "sha256": "bca7c5d72b4d1ba668bf78ac6de9098856d18ed3628e471f715a087c82748642"
     }
   ]
 }

@@ -285,6 +285,7 @@ private:
     void UpdateSafetyIsolator();
     void TickSafetyResponseAcceptance();
     void TickFireSpreadAcceptance();
+    void TickGaitPreview();
     void InitializeFireSpread();
     void UpdateFireSpread();
     void ResetFireSpread();
